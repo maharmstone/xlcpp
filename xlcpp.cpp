@@ -123,7 +123,7 @@ string sheet::xml() const {
         writer.attribute("collapsed", "false");
 
         for (const auto& c : r.cells) {
-            writer.start_element("cell");
+            writer.start_element("c");
 
             writer.attribute("r", make_reference(r.num, c.num));
             writer.attribute("s", "0"); // style
