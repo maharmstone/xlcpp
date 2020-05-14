@@ -54,6 +54,7 @@ public:
     row(unsigned int num) : num(num) { }
     cell& add_cell(int val);
     cell& add_cell(const std::string_view& val);
+    cell& add_cell(double val);
 
 private:
     friend sheet;
@@ -66,12 +67,13 @@ class cell {
 public:
     cell(unsigned int num, int val) : num(num), val(val) { }
     cell(unsigned int num, const std::string_view& val) : num(num), val(std::string(val)) { }
+    cell(unsigned int num, double val) : num(num), val(val) { }
 
 private:
     friend sheet;
 
     unsigned int num;
-    std::variant<int, std::string> val;
+    std::variant<int, std::string, double> val;
 };
 
 };

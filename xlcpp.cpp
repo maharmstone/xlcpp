@@ -142,7 +142,14 @@ string sheet::xml() const {
                 writer.text(get<string>(c.val));
                 writer.end_element();
                 writer.end_element();
-            }
+            } else if (holds_alternative<double>(c.val)) {
+                writer.attribute("t", "n"); // type
+
+                writer.start_element("v");
+                writer.text(to_string(get<double>(c.val)));
+                writer.end_element();
+            } else
+                throw runtime_error("Unknown type for cell.");
 
             writer.end_element();
         }
@@ -371,6 +378,10 @@ cell& row::add_cell(int val) {
 }
 
 cell& row::add_cell(const std::string_view& val) {
+    return *cells.emplace(cells.end(), cells.size() + 1, val);
+}
+
+cell& row::add_cell(double val) {
     return *cells.emplace(cells.end(), cells.size() + 1, val);
 }
 
