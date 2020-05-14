@@ -182,6 +182,11 @@ void workbook::write_content_types_xml(struct archive* a) const {
             writer.end_element();
         }
 
+        writer.start_element("Override");
+        writer.attribute("PartName", "/_rels/.rels");
+        writer.attribute("ContentType", "application/vnd.openxmlformats-package.relationships+xml");
+        writer.end_element();
+
         writer.end_element();
 
         writer.end_document();
@@ -191,6 +196,41 @@ void workbook::write_content_types_xml(struct archive* a) const {
 
     entry = archive_entry_new();
     archive_entry_set_pathname(entry, "[Content_Types].xml");
+    archive_entry_set_size(entry, data.length());
+    archive_entry_set_filetype(entry, AE_IFREG);
+    archive_entry_set_perm(entry, 0644);
+    archive_write_header(a, entry);
+    archive_write_data(a, data.data(), data.length());
+    // FIXME - set date?
+    archive_entry_free(entry);
+}
+
+void workbook::write_rels(struct archive* a) const {
+    struct archive_entry* entry;
+    string data;
+
+    {
+        xml_writer writer;
+
+        writer.start_document();
+
+        writer.start_element("Relationships", {{"", "http://schemas.openxmlformats.org/package/2006/relationships"}});
+
+        writer.start_element("Relationship");
+        writer.attribute("Id", "rId1");
+        writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument");
+        writer.attribute("Target", "/xl/workbook.xml");
+        writer.end_element();
+
+        writer.end_element();
+
+        writer.end_document();
+
+        data = move(writer.dump());
+    }
+
+    entry = archive_entry_new();
+    archive_entry_set_pathname(entry, "_rels/.rels");
     archive_entry_set_size(entry, data.length());
     archive_entry_set_filetype(entry, AE_IFREG);
     archive_entry_set_perm(entry, 0644);
@@ -216,6 +256,7 @@ void workbook::save(const filesystem::path& fn) const {
 
     write_workbook_xml(a);
     write_content_types_xml(a);
+    write_rels(a);
 
     archive_write_close(a);
     archive_write_free(a);
