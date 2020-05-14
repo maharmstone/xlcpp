@@ -159,6 +159,47 @@ void workbook::write_workbook_xml(struct archive* a) const {
     archive_entry_free(entry);
 }
 
+void workbook::write_content_types_xml(struct archive* a) const {
+    struct archive_entry* entry;
+    string data;
+
+    {
+        xml_writer writer;
+
+        writer.start_document();
+
+        writer.start_element("Types", {{"", "http://schemas.openxmlformats.org/package/2006/content-types"}});
+
+        writer.start_element("Override");
+        writer.attribute("PartName", "/xl/workbook.xml");
+        writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
+        writer.end_element();
+
+        for (const auto& sh : sheets) {
+            writer.start_element("Override");
+            writer.attribute("PartName", "/xl/worksheets/sheet" + to_string(sh.num) + ".xml");
+            writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml");
+            writer.end_element();
+        }
+
+        writer.end_element();
+
+        writer.end_document();
+
+        data = move(writer.dump());
+    }
+
+    entry = archive_entry_new();
+    archive_entry_set_pathname(entry, "[Content_Types].xml");
+    archive_entry_set_size(entry, data.length());
+    archive_entry_set_filetype(entry, AE_IFREG);
+    archive_entry_set_perm(entry, 0644);
+    archive_write_header(a, entry);
+    archive_write_data(a, data.data(), data.length());
+    // FIXME - set date?
+    archive_entry_free(entry);
+}
+
 void workbook::save(const filesystem::path& fn) const {
     struct archive* a;
 
@@ -174,6 +215,7 @@ void workbook::save(const filesystem::path& fn) const {
     }
 
     write_workbook_xml(a);
+    write_content_types_xml(a);
 
     archive_write_close(a);
     archive_write_free(a);
