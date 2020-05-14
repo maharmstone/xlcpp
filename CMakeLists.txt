@@ -13,6 +13,7 @@ set(SRC_FILES xlcpp.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 add_library(xlcppstatic STATIC ${SRC_FILES})
+target_link_libraries(xlcpp archive)
 
 target_compile_options(xlcpp PRIVATE
 	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
@@ -26,4 +27,5 @@ install(FILES xlcpp.h DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
 add_executable(xltest xltest.cpp)
 target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(xltest xlcpp)
 
