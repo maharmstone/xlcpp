@@ -23,6 +23,7 @@ private:
     void write_workbook_xml(struct archive* a) const;
     void write_content_types_xml(struct archive* a) const;
     void write_rels(struct archive* a) const;
+    void write_workbook_rels(struct archive* a) const;
 
     std::list<sheet> sheets;
 };
