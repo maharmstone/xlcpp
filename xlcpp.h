@@ -20,6 +20,8 @@ public:
     void save(const std::filesystem::path& fn) const;
 
 private:
+    void write_workbook_xml(struct archive* a) const;
+
     std::vector<sheet> sheets;
 };
 
