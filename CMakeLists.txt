@@ -24,3 +24,6 @@ install(TARGETS xlcpp DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(TARGETS xlcppstatic DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(FILES xlcpp.h DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
+add_executable(xltest xltest.cpp)
+target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+
