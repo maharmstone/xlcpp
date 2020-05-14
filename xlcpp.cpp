@@ -84,6 +84,24 @@ sheet& workbook::add_sheet(const string& name) {
     return *sheets.emplace(sheets.end(), name, sheets.size() + 1);
 }
 
+static string make_reference(unsigned int row, unsigned int col) {
+    char colstr[4];
+
+    col--;
+
+    if (col < 26) {
+        colstr[0] = col + 'A';
+        colstr[1] = 0;
+    } else if (col < 702) {
+        colstr[0] = ((col / 26) - 1) + 'A';
+        colstr[1] = (col % 26) + 'A';
+        colstr[2] = 0;
+    } else // FIXME - support three-letter columns
+        throw runtime_error("Column " + to_string(col) + " too large.");
+
+    return string(colstr) + to_string(row);
+}
+
 string sheet::xml() const {
     xml_writer writer;
 
@@ -92,7 +110,35 @@ string sheet::xml() const {
     writer.start_element("worksheet", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}});
 
     writer.start_element("sheetData");
-    // FIXME
+
+    for (const auto& r : rows) {
+        writer.start_element("row");
+
+        writer.attribute("r", to_string(r.num));
+        writer.attribute("customFormat", "false");
+        writer.attribute("ht", "12.8");
+        writer.attribute("hidden", "false");
+        writer.attribute("customHeight", "false");
+        writer.attribute("outlineLevel", "0");
+        writer.attribute("collapsed", "false");
+
+        for (const auto& c : r.cells) {
+            writer.start_element("cell");
+
+            writer.attribute("r", make_reference(r.num, c.num));
+            writer.attribute("s", "0"); // style
+            writer.attribute("t", "n"); // type
+
+            writer.start_element("v");
+            writer.text(to_string(c.val));
+            writer.end_element();
+
+            writer.end_element();
+        }
+
+        writer.end_element();
+    }
+
     writer.end_element();
 
     writer.end_element();
@@ -260,6 +306,14 @@ void workbook::save(const filesystem::path& fn) const {
 
     archive_write_close(a);
     archive_write_free(a);
+}
+
+row& sheet::add_row() {
+    return *rows.emplace(rows.end(), rows.size() + 1);
+}
+
+cell& row::add_cell(int val) {
+    return *cells.emplace(cells.end(), cells.size() + 1, val);
 }
 
 }
