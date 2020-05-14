@@ -5,6 +5,64 @@
 
 using namespace std;
 
+class xml_writer {
+public:
+    xml_writer() {
+        buf = xmlBufferCreate();
+        if (!buf)
+            throw runtime_error("xmlBufferCreate failed");
+
+        writer = xmlNewTextWriterMemory(buf, 0);
+        if (!writer) {
+            xmlBufferFree(buf);
+            throw runtime_error("xmlNewTextWriterMemory failed");
+        }
+    }
+
+    ~xml_writer() {
+        xmlFreeTextWriter(writer);
+        xmlBufferFree(buf);
+    }
+
+    string dump() const {
+        return (char*)buf->content;
+    }
+
+    void start_document() {
+        int rc = xmlTextWriterStartDocument(writer, nullptr, "UTF-8", nullptr);
+        if (rc < 0)
+            throw runtime_error("xmlTextWriterStartDocument failed (error " + to_string(rc) + ")");
+    }
+
+    void end_document() {
+        int rc = xmlTextWriterEndDocument(writer);
+        if (rc < 0)
+            throw runtime_error("xmlTextWriterEndDocument failed (error " + to_string(rc) + ")");
+    }
+
+    void start_element(const string& tag) {
+        int rc = xmlTextWriterStartElement(writer, BAD_CAST tag.c_str());
+        if (rc < 0)
+            throw runtime_error("xmlTextWriterStartElement failed (error " + to_string(rc) + ")");
+    }
+
+    void end_element() {
+        int rc = xmlTextWriterEndElement(writer);
+        if (rc < 0)
+            throw runtime_error("xmlTextWriterEndElement failed (error " + to_string(rc) + ")");
+    }
+
+    void text(const string& s) {
+        int rc = xmlTextWriterWriteString(writer, BAD_CAST s.c_str());
+        if (rc < 0)
+            throw runtime_error("xmlTextWriterWriteString failed (error " + to_string(rc) + ")");
+    }
+
+private:
+    xmlBufferPtr buf;
+    xmlTextWriterPtr writer;
+};
+
 namespace xlcpp {
 
 sheet& workbook::add_sheet(const string& name) {
@@ -12,56 +70,19 @@ sheet& workbook::add_sheet(const string& name) {
 }
 
 string sheet::xml() const {
-    int rc;
-    string ret;
-    xmlBufferPtr buf;
-    xmlTextWriterPtr writer;
+    xml_writer writer;
 
-    buf = xmlBufferCreate();
-    if (!buf)
-        throw runtime_error("xmlBufferCreate failed");
+    writer.start_document();
 
-    try {
-        writer = xmlNewTextWriterMemory(buf, 0);
-        if (!writer)
-            throw runtime_error("xmlNewTextWriterMemory failed");
+    writer.start_element("test");
 
-        try {
-            rc = xmlTextWriterStartDocument(writer, nullptr, "UTF-8", nullptr);
-            if (rc < 0)
-                throw runtime_error("xmlTextWriterStartDocument failed (error " + to_string(rc) + ")");
+    writer.text("he&<llo");
 
-            rc = xmlTextWriterStartElement(writer, BAD_CAST "test");
-            if (rc < 0)
-                throw runtime_error("xmlTextWriterStartElement failed (error " + to_string(rc) + ")");
+    writer.end_element();
 
-            rc = xmlTextWriterWriteString(writer, BAD_CAST "he&<llo");
-            if (rc < 0)
-                throw runtime_error("xmlTextWriterWriteString failed (error " + to_string(rc) + ")");
+    writer.end_document();
 
-            rc = xmlTextWriterEndElement(writer);
-            if (rc < 0)
-                throw runtime_error("xmlTextWriterEndElement failed (error " + to_string(rc) + ")");
-
-            rc = xmlTextWriterEndDocument(writer);
-            if (rc < 0)
-                throw runtime_error("xmlTextWriterEndDocument failed (error " + to_string(rc) + ")");
-        } catch (...) {
-            xmlFreeTextWriter(writer);
-            throw;
-        }
-
-        xmlFreeTextWriter(writer);
-    } catch (...) {
-        xmlBufferFree(buf);
-        throw;
-    }
-
-    ret = (char*)buf->content;
-
-    xmlBufferFree(buf);
-
-    return ret;
+    return writer.dump();
 }
 
 void sheet::write(struct archive* a) const {
