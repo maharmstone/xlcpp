@@ -126,12 +126,23 @@ string sheet::xml() const {
             writer.start_element("c");
 
             writer.attribute("r", make_reference(r.num, c.num));
-            writer.attribute("s", "0"); // style
-            writer.attribute("t", "n"); // type
+//             writer.attribute("s", "0"); // style
 
-            writer.start_element("v");
-            writer.text(to_string(c.val));
-            writer.end_element();
+            if (holds_alternative<int>(c.val)) {
+                writer.attribute("t", "n"); // type
+
+                writer.start_element("v");
+                writer.text(to_string(get<int>(c.val)));
+                writer.end_element();
+            } else if (holds_alternative<string>(c.val)) {
+                writer.attribute("t", "inlineStr"); // FIXME - use shared string table
+
+                writer.start_element("is");
+                writer.start_element("t");
+                writer.text(get<string>(c.val));
+                writer.end_element();
+                writer.end_element();
+            }
 
             writer.end_element();
         }
@@ -356,6 +367,10 @@ row& sheet::add_row() {
 }
 
 cell& row::add_cell(int val) {
+    return *cells.emplace(cells.end(), cells.size() + 1, val);
+}
+
+cell& row::add_cell(const std::string_view& val) {
     return *cells.emplace(cells.end(), cells.size() + 1, val);
 }
 

@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <vector>
 #include <list>
+#include <variant>
 
 // FIXME - remove these from public headers
 #include <archive.h>
@@ -52,6 +53,7 @@ class row {
 public:
     row(unsigned int num) : num(num) { }
     cell& add_cell(int val);
+    cell& add_cell(const std::string_view& val);
 
 private:
     friend sheet;
@@ -63,12 +65,13 @@ private:
 class cell {
 public:
     cell(unsigned int num, int val) : num(num), val(val) { }
+    cell(unsigned int num, const std::string_view& val) : num(num), val(std::string(val)) { }
 
 private:
     friend sheet;
 
     unsigned int num;
-    int val;
+    std::variant<int, std::string> val;
 };
 
 };

@@ -9,10 +9,13 @@ static void main2() {
     auto& sh = wb.add_sheet("Sheet1");
 
     auto& row = sh.add_row();
-
     row.add_cell(1);
     row.add_cell(2);
     row.add_cell(3);
+
+    auto& row2 = sh.add_row();
+    row2.add_cell("hello");
+    row2.add_cell("world");
 
     wb.save("out.xlsx");
 }
