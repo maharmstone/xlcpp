@@ -126,7 +126,7 @@ string sheet::xml() const {
             writer.start_element("c");
 
             writer.attribute("r", make_reference(r.num, c.num));
-//             writer.attribute("s", "0"); // style
+            writer.attribute("s", to_string(c.sty->num));
 
             if (holds_alternative<int>(c.val)) {
                 writer.attribute("t", "n"); // number
@@ -271,6 +271,13 @@ void workbook::write_content_types_xml(struct archive* a) const {
             writer.end_element();
         }
 
+        if (!styles.empty()) {
+            writer.start_element("Override");
+            writer.attribute("PartName", "/xl/styles.xml");
+            writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml");
+            writer.end_element();
+        }
+
         writer.end_element();
 
         writer.end_document();
@@ -351,6 +358,15 @@ void workbook::write_workbook_rels(struct archive* a) const {
             writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings");
             writer.attribute("Target", "sharedStrings.xml");
             writer.end_element();
+            num++;
+        }
+
+        if (!styles.empty()) {
+            writer.start_element("Relationship");
+            writer.attribute("Id", "rId" + to_string(num));
+            writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles");
+            writer.attribute("Target", "styles.xml");
+            writer.end_element();
         }
 
         writer.end_element();
@@ -421,6 +437,83 @@ void workbook::write_shared_strings(struct archive* a) const {
     archive_entry_free(entry);
 }
 
+void workbook::write_styles(struct archive* a) const {
+    struct archive_entry* entry;
+    string data;
+
+    {
+        xml_writer writer;
+        vector<const style*> sty;
+        vector<unsigned int> number_format_nums;
+        unordered_map<string, unsigned int> number_formats;
+        vector<const string*> number_formats2;
+
+        writer.start_document();
+
+        writer.start_element("styleSheet");
+        writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+
+        for (const auto& s : styles) {
+            if (number_formats.find(s.number_format) == number_formats.end()) {
+                number_formats[s.number_format] = number_formats.size();
+                number_formats2.emplace_back(&s.number_format);
+            }
+        }
+
+        writer.start_element("numFmts");
+        writer.attribute("count", to_string(number_formats.size()));
+
+        for (unsigned int i = 0; i < number_formats.size(); i++) {
+            writer.start_element("numFmt");
+            writer.attribute("numFmtId", to_string(i));
+            writer.attribute("formatCode", *number_formats2[i]);
+            writer.end_element();
+        }
+
+        writer.end_element();
+
+        writer.start_element("cellStyleXfs");
+        writer.attribute("count", "1");
+        writer.start_element("xf");
+        writer.end_element();
+        writer.end_element();
+
+        sty.resize(styles.size());
+
+        for (const auto& s : styles) {
+            sty[s.num] = &s;
+        }
+
+        writer.start_element("cellXfs");
+        writer.attribute("count", to_string(styles.size()));
+
+        for (const auto& s : sty) {
+            writer.start_element("xf");
+            writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
+            writer.end_element();
+        }
+
+        writer.end_element();
+
+        writer.end_element();
+
+        writer.end_document();
+
+        data = move(writer.dump());
+    }
+
+    entry = archive_entry_new();
+    archive_entry_set_pathname(entry, "xl/styles.xml");
+    archive_entry_set_size(entry, data.length());
+    archive_entry_set_filetype(entry, AE_IFREG);
+    archive_entry_set_perm(entry, 0644);
+    archive_write_header(a, entry);
+    archive_write_data(a, data.data(), data.length());
+    // FIXME - set date?
+    archive_entry_free(entry);
+}
+
+
 void workbook::save(const filesystem::path& fn) const {
     struct archive* a;
 
@@ -440,6 +533,9 @@ void workbook::save(const filesystem::path& fn) const {
 
     if (!shared_strings.empty())
         write_shared_strings(a);
+
+    if (!styles.empty())
+        write_styles(a);
 
     archive_write_close(a);
     archive_write_free(a);
@@ -478,8 +574,22 @@ shared_string workbook::get_shared_string(const string& s) {
     return ss;
 }
 
+cell::cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) {
+    sty = parent.parent.parent.find_style(style("General"));
+}
+
 cell::cell(row& r, unsigned int num, const string& val) : parent(r), num(num) {
     this->val = parent.parent.parent.get_shared_string(val);
+
+    sty = parent.parent.parent.find_style(style("General"));
+}
+
+cell::cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) {
+    sty = parent.parent.parent.find_style(style("General"));
+}
+
+cell::cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val(val) {
+    sty = parent.parent.parent.find_style(style("dd/mm/yy")); // FIXME - localization
 }
 
 unsigned int date::to_number() const {
@@ -493,6 +603,10 @@ unsigned int date::to_number() const {
     n -= 2448556;
 
     return n;
+}
+
+bool operator==(const style& lhs, const style& rhs) noexcept {
+    return lhs.number_format == rhs.number_format;
 }
 
 }

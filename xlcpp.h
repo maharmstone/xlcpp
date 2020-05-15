@@ -5,6 +5,7 @@
 #include <list>
 #include <variant>
 #include <unordered_map>
+#include <unordered_set>
 
 // FIXME - remove these from public headers
 #include <archive.h>
@@ -17,6 +18,24 @@ namespace xlcpp {
 struct shared_string {
     unsigned int num;
 };
+
+class style {
+public:
+    style(const std::string& number_format) : number_format(number_format) { }
+
+    std::string number_format;
+    mutable unsigned int num;
+    mutable unsigned int number_format_num;
+};
+
+class style_hash {
+public:
+    size_t operator()(const style& s) const {
+        return std::hash<std::string>{}(s.number_format);
+    }
+};
+
+bool operator==(const style& lhs, const style& rhs) noexcept;
 
 class sheet;
 class cell;
@@ -33,11 +52,23 @@ private:
     void write_workbook_rels(struct archive* a) const;
     shared_string get_shared_string(const std::string& s);
     void write_shared_strings(struct archive* a) const;
+    void write_styles(struct archive* a) const;
+
+    template<class... Args>
+    const style* find_style(Args&&... args) {
+        auto ret = styles.emplace(args...);
+
+        if (ret.second)
+            ret.first->num = styles.size() - 1;
+
+        return &(*ret.first);
+    }
 
     friend cell;
 
     std::list<sheet> sheets;
     std::unordered_map<std::string, shared_string> shared_strings;
+    std::unordered_set<style, style_hash> styles;
 };
 
 class row;
@@ -90,15 +121,18 @@ private:
 
 class cell {
 public:
-    cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) { }
+    cell(row& r, unsigned int num, int val);
     cell(row& r, unsigned int num, const std::string& val);
-    cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) { }
-    cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val(val) { }
+    cell(row& r, unsigned int num, double val);
+    cell(row& r, unsigned int num, const date& val);
+    void set_number_format(const std::string& fmt);
 
     row& parent;
 
 private:
     friend sheet;
+
+    const style* sty;
 
     unsigned int num;
     std::variant<int, shared_string, double, date> val;
