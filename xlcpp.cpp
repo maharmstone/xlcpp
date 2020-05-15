@@ -152,6 +152,12 @@ string sheet::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<date>(c.val).to_number()));
                 writer.end_element();
+            } else if (holds_alternative<time>(c.val)) {
+                writer.attribute("t", "n"); // number
+
+                writer.start_element("v");
+                writer.text(to_string(get<time>(c.val).to_number()));
+                writer.end_element();
             } else
                 throw runtime_error("Unknown type for cell.");
 
@@ -545,22 +551,6 @@ row& sheet::add_row() {
     return *rows.emplace(rows.end(), *this, rows.size() + 1);
 }
 
-cell& row::add_cell(int val) {
-    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
-}
-
-cell& row::add_cell(const string& val) {
-    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
-}
-
-cell& row::add_cell(double val) {
-    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
-}
-
-cell& row::add_cell(const date& val) {
-    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
-}
-
 shared_string workbook::get_shared_string(const string& s) {
     shared_string ss;
 
@@ -592,6 +582,10 @@ cell::cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val
     sty = parent.parent.parent.find_style(style("dd/mm/yy")); // FIXME - localization
 }
 
+cell::cell(row& r, unsigned int num, const time& val) : parent(r), num(num), val(val) {
+    sty = parent.parent.parent.find_style(style("HH:MM:SS")); // FIXME - localization
+}
+
 unsigned int date::to_number() const {
     int m2 = ((int)month - 14) / 12;
     long long n;
@@ -607,6 +601,10 @@ unsigned int date::to_number() const {
 
 bool operator==(const style& lhs, const style& rhs) noexcept {
     return lhs.number_format == rhs.number_format;
+}
+
+double time::to_number() const {
+    return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
 }
 
 }

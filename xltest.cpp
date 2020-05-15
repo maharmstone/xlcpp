@@ -17,6 +17,7 @@ static void main2() {
     row2.add_cell("hello");
     row2.add_cell(42.1);
     row2.add_cell(xlcpp::date{1998, 7, 5});
+    row2.add_cell(xlcpp::time{12, 34, 56});
 
     wb.save("out.xlsx");
 }

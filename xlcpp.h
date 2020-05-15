@@ -100,15 +100,25 @@ public:
     unsigned int year, month, day;
 };
 
+class time {
+public:
+    time(unsigned int hour, unsigned int minute, unsigned int second) : hour(hour), minute(minute), second(second) { }
+
+    double to_number() const;
+
+    unsigned int hour, minute, second;
+};
+
 class cell;
 
 class row {
 public:
     row(sheet& s, unsigned int num) : parent(s), num(num) { }
-    cell& add_cell(int val);
-    cell& add_cell(const std::string& val);
-    cell& add_cell(double val);
-    cell& add_cell(const date& val);
+
+    template<typename T>
+    cell& add_cell(const T& val) {
+        return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
+    }
 
     sheet& parent;
 
@@ -125,6 +135,7 @@ public:
     cell(row& r, unsigned int num, const std::string& val);
     cell(row& r, unsigned int num, double val);
     cell(row& r, unsigned int num, const date& val);
+    cell(row& r, unsigned int num, const time& val);
     void set_number_format(const std::string& fmt);
 
     row& parent;
@@ -135,7 +146,7 @@ private:
     const style* sty;
 
     unsigned int num;
-    std::variant<int, shared_string, double, date> val;
+    std::variant<int, shared_string, double, date, time> val;
 };
 
 };
