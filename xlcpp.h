@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <variant>
+#include <unordered_map>
 
 // FIXME - remove these from public headers
 #include <archive.h>
@@ -13,7 +14,12 @@
 
 namespace xlcpp {
 
+struct shared_string {
+    unsigned int num;
+};
+
 class sheet;
+class cell;
 
 class workbook {
 public:
@@ -25,16 +31,23 @@ private:
     void write_content_types_xml(struct archive* a) const;
     void write_rels(struct archive* a) const;
     void write_workbook_rels(struct archive* a) const;
+    shared_string get_shared_string(const std::string& s);
+    void write_shared_strings(struct archive* a) const;
+
+    friend cell;
 
     std::list<sheet> sheets;
+    std::unordered_map<std::string, shared_string> shared_strings;
 };
 
 class row;
 
 class sheet {
 public:
-    sheet(const std::string& name, unsigned int num) : name(name), num(num) { }
+    sheet(workbook& wb, const std::string& name, unsigned int num) : parent(wb), name(name), num(num) { }
     row& add_row();
+
+    workbook& parent;
 
 private:
     void write(struct archive* a) const;
@@ -51,10 +64,12 @@ class cell;
 
 class row {
 public:
-    row(unsigned int num) : num(num) { }
+    row(sheet& s, unsigned int num) : parent(s), num(num) { }
     cell& add_cell(int val);
-    cell& add_cell(const std::string_view& val);
+    cell& add_cell(const std::string& val);
     cell& add_cell(double val);
+
+    sheet& parent;
 
 private:
     friend sheet;
@@ -65,15 +80,17 @@ private:
 
 class cell {
 public:
-    cell(unsigned int num, int val) : num(num), val(val) { }
-    cell(unsigned int num, const std::string_view& val) : num(num), val(std::string(val)) { }
-    cell(unsigned int num, double val) : num(num), val(val) { }
+    cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) { }
+    cell(row& r, unsigned int num, const std::string& val);
+    cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) { }
+
+    row& parent;
 
 private:
     friend sheet;
 
     unsigned int num;
-    std::variant<int, std::string, double> val;
+    std::variant<int, shared_string, double> val;
 };
 
 };

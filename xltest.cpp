@@ -16,6 +16,7 @@ static void main2() {
     auto& row2 = sh.add_row();
     row2.add_cell("hello");
     row2.add_cell(42.1);
+    row2.add_cell("hello");
 
     wb.save("out.xlsx");
 }

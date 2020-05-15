@@ -81,7 +81,7 @@ private:
 namespace xlcpp {
 
 sheet& workbook::add_sheet(const string& name) {
-    return *sheets.emplace(sheets.end(), name, sheets.size() + 1);
+    return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
 }
 
 static string make_reference(unsigned int row, unsigned int col) {
@@ -134,13 +134,11 @@ string sheet::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<int>(c.val)));
                 writer.end_element();
-            } else if (holds_alternative<string>(c.val)) {
-                writer.attribute("t", "inlineStr"); // FIXME - use shared string table
+            } else if (holds_alternative<shared_string>(c.val)) {
+                writer.attribute("t", "s"); // shared string
 
-                writer.start_element("is");
-                writer.start_element("t");
-                writer.text(get<string>(c.val));
-                writer.end_element();
+                writer.start_element("v");
+                writer.text(to_string(get<shared_string>(c.val).num));
                 writer.end_element();
             } else if (holds_alternative<double>(c.val)) {
                 writer.attribute("t", "n"); // type
@@ -256,6 +254,13 @@ void workbook::write_content_types_xml(struct archive* a) const {
         writer.attribute("ContentType", "application/vnd.openxmlformats-package.relationships+xml");
         writer.end_element();
 
+        if (!shared_strings.empty()) {
+            writer.start_element("Override");
+            writer.attribute("PartName", "/xl/sharedStrings.xml");
+            writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml");
+            writer.end_element();
+        }
+
         writer.end_element();
 
         writer.end_document();
@@ -314,6 +319,7 @@ void workbook::write_workbook_rels(struct archive* a) const {
     string data;
 
     {
+        unsigned int num = 1;
         xml_writer writer;
 
         writer.start_document();
@@ -322,9 +328,18 @@ void workbook::write_workbook_rels(struct archive* a) const {
 
         for (const auto& sh : sheets) {
             writer.start_element("Relationship");
-            writer.attribute("Id", "rId" + to_string(sh.num));
+            writer.attribute("Id", "rId" + to_string(num));
             writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
             writer.attribute("Target", "worksheets/sheet" + to_string(sh.num) + ".xml");
+            writer.end_element();
+            num++;
+        }
+
+        if (!shared_strings.empty()) {
+            writer.start_element("Relationship");
+            writer.attribute("Id", "rId" + to_string(num));
+            writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings");
+            writer.attribute("Target", "sharedStrings.xml");
             writer.end_element();
         }
 
@@ -346,6 +361,56 @@ void workbook::write_workbook_rels(struct archive* a) const {
     archive_entry_free(entry);
 }
 
+void workbook::write_shared_strings(struct archive* a) const {
+    struct archive_entry* entry;
+    string data;
+
+    {
+        xml_writer writer;
+
+        writer.start_document();
+
+        writer.start_element("sst", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}});
+        writer.attribute("count", to_string(shared_strings.size()));
+        writer.attribute("uniqueCount", to_string(shared_strings.size()));
+
+        vector<string> strings;
+
+        strings.resize(shared_strings.size());
+
+        for (const auto& ss : shared_strings) {
+            strings[ss.second.num] = ss.first;
+        }
+
+        for (const auto& s : strings) {
+            writer.start_element("si");
+
+            writer.start_element("t");
+            writer.attribute("xml:space", "preserve");
+            writer.text(s);
+            writer.end_element();
+
+            writer.end_element();
+        }
+
+        writer.end_element();
+
+        writer.end_document();
+
+        data = move(writer.dump());
+    }
+
+    entry = archive_entry_new();
+    archive_entry_set_pathname(entry, "xl/sharedStrings.xml");
+    archive_entry_set_size(entry, data.length());
+    archive_entry_set_filetype(entry, AE_IFREG);
+    archive_entry_set_perm(entry, 0644);
+    archive_write_header(a, entry);
+    archive_write_data(a, data.data(), data.length());
+    // FIXME - set date?
+    archive_entry_free(entry);
+}
+
 void workbook::save(const filesystem::path& fn) const {
     struct archive* a;
 
@@ -353,8 +418,6 @@ void workbook::save(const filesystem::path& fn) const {
     archive_write_set_format_zip(a);
 
     archive_write_open_filename(a, fn.u8string().c_str());
-
-    // FIXME - [Content_Types].xml
 
     for (const auto& sh : sheets) {
         sh.write(a);
@@ -365,24 +428,44 @@ void workbook::save(const filesystem::path& fn) const {
     write_rels(a);
     write_workbook_rels(a);
 
+    if (!shared_strings.empty())
+        write_shared_strings(a);
+
     archive_write_close(a);
     archive_write_free(a);
 }
 
 row& sheet::add_row() {
-    return *rows.emplace(rows.end(), rows.size() + 1);
+    return *rows.emplace(rows.end(), *this, rows.size() + 1);
 }
 
 cell& row::add_cell(int val) {
-    return *cells.emplace(cells.end(), cells.size() + 1, val);
+    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
 }
 
-cell& row::add_cell(const std::string_view& val) {
-    return *cells.emplace(cells.end(), cells.size() + 1, val);
+cell& row::add_cell(const string& val) {
+    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
 }
 
 cell& row::add_cell(double val) {
-    return *cells.emplace(cells.end(), cells.size() + 1, val);
+    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
+}
+
+shared_string workbook::get_shared_string(const string& s) {
+    shared_string ss;
+
+    if (shared_strings.count(s) != 0)
+        return shared_strings.at(s);
+
+    ss.num = shared_strings.size();
+
+    shared_strings.emplace(s, ss);
+
+    return ss;
+}
+
+cell::cell(row& r, unsigned int num, const string& val) : parent(r), num(num) {
+    this->val = parent.parent.parent.get_shared_string(val);
 }
 
 }
