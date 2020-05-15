@@ -129,7 +129,7 @@ string sheet::xml() const {
 //             writer.attribute("s", "0"); // style
 
             if (holds_alternative<int>(c.val)) {
-                writer.attribute("t", "n"); // type
+                writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
                 writer.text(to_string(get<int>(c.val)));
@@ -141,10 +141,16 @@ string sheet::xml() const {
                 writer.text(to_string(get<shared_string>(c.val).num));
                 writer.end_element();
             } else if (holds_alternative<double>(c.val)) {
-                writer.attribute("t", "n"); // type
+                writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
                 writer.text(to_string(get<double>(c.val)));
+                writer.end_element();
+            } else if (holds_alternative<date>(c.val)) {
+                writer.attribute("t", "n"); // number
+
+                writer.start_element("v");
+                writer.text(to_string(get<date>(c.val).to_number()));
                 writer.end_element();
             } else
                 throw runtime_error("Unknown type for cell.");
@@ -189,6 +195,10 @@ void workbook::write_workbook_xml(struct archive* a) const {
         writer.start_document();
 
         writer.start_element("workbook", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}, {"r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships"}});
+
+        writer.start_element("workbookPr");
+        writer.attribute("date1904", "true");
+        writer.end_element();
 
         writer.start_element("sheets");
 
@@ -451,6 +461,10 @@ cell& row::add_cell(double val) {
     return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
 }
 
+cell& row::add_cell(const date& val) {
+    return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
+}
+
 shared_string workbook::get_shared_string(const string& s) {
     shared_string ss;
 
@@ -466,6 +480,19 @@ shared_string workbook::get_shared_string(const string& s) {
 
 cell::cell(row& r, unsigned int num, const string& val) : parent(r), num(num) {
     this->val = parent.parent.parent.get_shared_string(val);
+}
+
+unsigned int date::to_number() const {
+    int m2 = ((int)month - 14) / 12;
+    long long n;
+
+    n = (1461 * ((int)year + 4800 + m2)) / 4;
+    n += (367 * ((int)month - 2 - (12 * m2))) / 12;
+    n -= (3 * (((int)year + 4900 + m2)/100)) / 4;
+    n += day;
+    n -= 2448556;
+
+    return n;
 }
 
 }

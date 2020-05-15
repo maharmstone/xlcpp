@@ -60,6 +60,15 @@ private:
     std::list<row> rows;
 };
 
+class date {
+public:
+    date(unsigned int year, unsigned int month, unsigned int day) : year(year), month(month), day(day) { }
+
+    unsigned int to_number() const;
+
+    unsigned int year, month, day;
+};
+
 class cell;
 
 class row {
@@ -68,6 +77,7 @@ public:
     cell& add_cell(int val);
     cell& add_cell(const std::string& val);
     cell& add_cell(double val);
+    cell& add_cell(const date& val);
 
     sheet& parent;
 
@@ -83,6 +93,7 @@ public:
     cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) { }
     cell(row& r, unsigned int num, const std::string& val);
     cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) { }
+    cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val(val) { }
 
     row& parent;
 
@@ -90,7 +101,7 @@ private:
     friend sheet;
 
     unsigned int num;
-    std::variant<int, shared_string, double> val;
+    std::variant<int, shared_string, double, date> val;
 };
 
 };
