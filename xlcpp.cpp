@@ -491,6 +491,12 @@ void workbook::write_styles(struct archive* a) const {
         for (unsigned int i = 0; i < fonts.size(); i++) {
             writer.start_element("font");
 
+            if (fonts2[i]->bold) {
+                writer.start_element("b");
+                writer.attribute("val", "true");
+                writer.end_element();
+            }
+
             writer.start_element("sz");
             writer.attribute("val", to_string(fonts2[i]->font_size));
             writer.end_element();
@@ -629,7 +635,8 @@ unsigned int date::to_number() const {
 
 bool operator==(const font& lhs, const font& rhs) noexcept {
     return lhs.font_name == rhs.font_name &&
-        lhs.font_size == rhs.font_size;
+        lhs.font_size == rhs.font_size &&
+       ((lhs.bold && rhs.bold) || (!lhs.bold && !rhs.bold));
 }
 
 bool operator==(const style& lhs, const style& rhs) noexcept {
@@ -641,18 +648,18 @@ double time::to_number() const {
     return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
 }
 
-void style::set_font(const std::string& font_name, unsigned int font_size) {
-    this->font = xlcpp::font(font_name, font_size);
+void style::set_font(const std::string& font_name, unsigned int font_size, bool bold) {
+    this->font = xlcpp::font(font_name, font_size, bold);
 }
 
 void style::set_number_format(const std::string& fmt) {
     number_format = fmt;
 }
 
-void cell::set_font(const std::string& name, unsigned int size) {
+void cell::set_font(const std::string& name, unsigned int size, bool bold) {
     auto sty2 = *sty;
 
-    sty2.set_font(name, size);
+    sty2.set_font(name, size, bold);
 
     sty = parent.parent.parent.find_style(sty2);
 }

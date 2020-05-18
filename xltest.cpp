@@ -16,12 +16,13 @@ static void main2() {
     auto& row2 = sh.add_row();
 
     auto& c = row2.add_cell("hello");
-    c.set_font("Comic Sans MS", 12);
+    c.set_font("Comic Sans MS", 12, true);
 
     row2.add_cell(42.1);
 
     auto& c2 = row2.add_cell(xlcpp::date{1998, 7, 5});
     c2.set_number_format("YYYY-MM-DD");
+    c2.set_font("Comic Sans MS", 12);
 
     row2.add_cell(xlcpp::time{12, 34, 56});
 

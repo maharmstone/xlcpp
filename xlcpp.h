@@ -21,17 +21,19 @@ struct shared_string {
 
 class font {
 public:
-    font(const std::string& font_name, unsigned int font_size) : font_name(font_name), font_size(font_size) { }
+    font(const std::string& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
 
     std::string font_name;
     unsigned int font_size;
+    bool bold;
 };
 
 class font_hash {
 public:
     size_t operator()(const font& f) const {
         return std::hash<std::string>{}(f.font_name) |
-            (std::hash<unsigned int>{}(f.font_size) << 1);
+            (std::hash<unsigned int>{}(f.font_size) << 1) |
+            (std::hash<bool>{}(f.bold) << 2);
     }
 };
 
@@ -39,10 +41,10 @@ bool operator==(const font& lhs, const font& rhs) noexcept;
 
 class style {
 public:
-    style(const std::string& number_format, const std::string& font, unsigned int font_size) :
-        number_format(number_format), font(font, font_size) { }
+    style(const std::string& number_format, const std::string& font, unsigned int font_size, bool bold = false) :
+        number_format(number_format), font(font, font_size, bold) { }
 
-    void set_font(const std::string& font_name, unsigned int font_size);
+    void set_font(const std::string& font_name, unsigned int font_size, bool bold);
     void set_number_format(const std::string& fmt);
 
     std::string number_format;
@@ -162,7 +164,7 @@ public:
     cell(row& r, unsigned int num, const date& val);
     cell(row& r, unsigned int num, const time& val);
     void set_number_format(const std::string& fmt);
-    void set_font(const std::string& name, unsigned int size);
+    void set_font(const std::string& name, unsigned int size, bool bold = false);
 
     row& parent;
 
