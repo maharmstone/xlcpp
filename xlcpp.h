@@ -136,6 +136,17 @@ public:
     unsigned int hour, minute, second;
 };
 
+class datetime {
+public:
+    datetime(unsigned int year, unsigned int month, unsigned int day, unsigned int hour, unsigned int minute, unsigned int second):
+        d(year, month, day), t(hour, minute, second) { }
+
+    double to_number() const;
+
+    date d;
+    time t;
+};
+
 class cell;
 
 class row {
@@ -163,6 +174,7 @@ public:
     cell(row& r, unsigned int num, double val);
     cell(row& r, unsigned int num, const date& val);
     cell(row& r, unsigned int num, const time& val);
+    cell(row& r, unsigned int num, const datetime& val);
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
 
@@ -174,7 +186,7 @@ private:
     const style* sty;
 
     unsigned int num;
-    std::variant<int, shared_string, double, date, time> val;
+    std::variant<int, shared_string, double, date, time, datetime> val;
 };
 
 };

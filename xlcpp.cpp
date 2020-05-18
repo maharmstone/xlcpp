@@ -158,6 +158,12 @@ string sheet::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<time>(c.val).to_number()));
                 writer.end_element();
+            } else if (holds_alternative<datetime>(c.val)) {
+                writer.attribute("t", "n"); // number
+
+                writer.start_element("v");
+                writer.text(to_string(get<datetime>(c.val).to_number()));
+                writer.end_element();
             } else
                 throw runtime_error("Unknown type for cell.");
 
@@ -620,6 +626,10 @@ cell::cell(row& r, unsigned int num, const time& val) : parent(r), num(num), val
     sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
 }
 
+cell::cell(row& r, unsigned int num, const datetime& val) : parent(r), num(num), val(val) {
+    sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
+}
+
 unsigned int date::to_number() const {
     int m2 = ((int)month - 14) / 12;
     long long n;
@@ -646,6 +656,10 @@ bool operator==(const style& lhs, const style& rhs) noexcept {
 
 double time::to_number() const {
     return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
+}
+
+double datetime::to_number() const {
+    return (double)d.to_number() + t.to_number();
 }
 
 void style::set_font(const std::string& font_name, unsigned int font_size, bool bold) {
