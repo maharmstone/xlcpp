@@ -1,5 +1,6 @@
 #include <xlcpp.h>
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 
@@ -26,7 +27,7 @@ static void main2() {
 
     row2.add_cell(xlcpp::time{12, 34, 56});
 
-    row2.add_cell(xlcpp::datetime{1998, 7, 5, 12, 34, 56});
+    row2.add_cell(chrono::system_clock::now());
 
     wb.save("out.xlsx");
 }

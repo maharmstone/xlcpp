@@ -686,4 +686,20 @@ void cell::set_number_format(const std::string& fmt) {
     sty = parent.parent.parent.find_style(sty2);
 }
 
+date::date(time_t tt) {
+    tm local_tm = *localtime(&tt);
+
+    year = local_tm.tm_year + 1900;
+    month = local_tm.tm_mon + 1;
+    day = local_tm.tm_mday;
+}
+
+time::time(time_t tt) {
+    tm local_tm = *localtime(&tt);
+
+    hour = local_tm.tm_hour;
+    minute = local_tm.tm_min;
+    second = local_tm.tm_sec;
+}
+
 }

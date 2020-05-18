@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <vector>
 #include <list>
+#include <chrono>
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
@@ -121,6 +122,7 @@ private:
 class date {
 public:
     date(unsigned int year, unsigned int month, unsigned int day) : year(year), month(month), day(day) { }
+    date(time_t tt);
 
     unsigned int to_number() const;
 
@@ -130,6 +132,7 @@ public:
 class time {
 public:
     time(unsigned int hour, unsigned int minute, unsigned int second) : hour(hour), minute(minute), second(second) { }
+    time(time_t tt);
 
     double to_number() const;
 
@@ -140,6 +143,8 @@ class datetime {
 public:
     datetime(unsigned int year, unsigned int month, unsigned int day, unsigned int hour, unsigned int minute, unsigned int second):
         d(year, month, day), t(hour, minute, second) { }
+    datetime(time_t tt) : d(tt), t(tt) { }
+    datetime(const std::chrono::system_clock::time_point& tp) : datetime(std::chrono::system_clock::to_time_t(tp)) { }
 
     double to_number() const;
 
@@ -175,6 +180,7 @@ public:
     cell(row& r, unsigned int num, const date& val);
     cell(row& r, unsigned int num, const time& val);
     cell(row& r, unsigned int num, const datetime& val);
+    cell(row& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell(r, num, datetime{val}) { }
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
 
