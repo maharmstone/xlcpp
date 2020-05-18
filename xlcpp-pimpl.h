@@ -1,6 +1,8 @@
 #pragma once
 
 #include "xlcpp.h"
+#include <unordered_map>
+#include <unordered_set>
 #include <archive.h>
 #include <archive_entry.h>
 

@@ -3,7 +3,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
-#include <unordered_map>
+#include <vector>
 
 using namespace std;
 

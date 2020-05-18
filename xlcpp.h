@@ -1,12 +1,9 @@
 #pragma once
 
 #include <filesystem>
-#include <vector>
 #include <list>
 #include <chrono>
 #include <variant>
-#include <unordered_map>
-#include <unordered_set>
 
 // FIXME - remove these from public headers
 #include <archive.h>
