@@ -645,10 +645,22 @@ void style::set_font(const std::string& font_name, unsigned int font_size) {
     this->font = xlcpp::font(font_name, font_size);
 }
 
+void style::set_number_format(const std::string& fmt) {
+    number_format = fmt;
+}
+
 void cell::set_font(const std::string& name, unsigned int size) {
     auto sty2 = *sty;
 
     sty2.set_font(name, size);
+
+    sty = parent.parent.parent.find_style(sty2);
+}
+
+void cell::set_number_format(const std::string& fmt) {
+    auto sty2 = *sty;
+
+    sty2.set_number_format(fmt);
 
     sty = parent.parent.parent.find_style(sty2);
 }

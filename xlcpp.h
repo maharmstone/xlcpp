@@ -43,6 +43,7 @@ public:
         number_format(number_format), font(font, font_size) { }
 
     void set_font(const std::string& font_name, unsigned int font_size);
+    void set_number_format(const std::string& fmt);
 
     std::string number_format;
     xlcpp::font font;

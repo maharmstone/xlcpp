@@ -19,7 +19,10 @@ static void main2() {
     c.set_font("Comic Sans MS", 12);
 
     row2.add_cell(42.1);
-    row2.add_cell(xlcpp::date{1998, 7, 5});
+
+    auto& c2 = row2.add_cell(xlcpp::date{1998, 7, 5});
+    c2.set_number_format("YYYY-MM-DD");
+
     row2.add_cell(xlcpp::time{12, 34, 56});
 
     wb.save("out.xlsx");
