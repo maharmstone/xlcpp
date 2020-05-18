@@ -1,4 +1,5 @@
 #include "xlcpp.h"
+#include "xlcpp-pimpl.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
@@ -80,8 +81,12 @@ private:
 
 namespace xlcpp {
 
-sheet& workbook::add_sheet(const string& name) {
+sheet& workbook_pimpl::add_sheet(const string& name) {
     return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
+}
+
+sheet& workbook::add_sheet(const string& name) {
+    return impl->add_sheet(name);
 }
 
 static string make_reference(unsigned int row, unsigned int col) {
@@ -197,7 +202,7 @@ void sheet::write(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_workbook_xml(struct archive* a) const {
+void workbook_pimpl::write_workbook_xml(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -243,7 +248,7 @@ void workbook::write_workbook_xml(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_content_types_xml(struct archive* a) const {
+void workbook_pimpl::write_content_types_xml(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -308,7 +313,7 @@ void workbook::write_content_types_xml(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_rels(struct archive* a) const {
+void workbook_pimpl::write_rels(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -343,7 +348,7 @@ void workbook::write_rels(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_workbook_rels(struct archive* a) const {
+void workbook_pimpl::write_workbook_rels(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -399,7 +404,7 @@ void workbook::write_workbook_rels(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_shared_strings(struct archive* a) const {
+void workbook_pimpl::write_shared_strings(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -449,7 +454,7 @@ void workbook::write_shared_strings(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook::write_styles(struct archive* a) const {
+void workbook_pimpl::write_styles(struct archive* a) const {
     struct archive_entry* entry;
     string data;
 
@@ -559,8 +564,7 @@ void workbook::write_styles(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-
-void workbook::save(const filesystem::path& fn) const {
+void workbook_pimpl::save(const filesystem::path& fn) const {
     struct archive* a;
 
     a = archive_write_new();
@@ -587,11 +591,15 @@ void workbook::save(const filesystem::path& fn) const {
     archive_write_free(a);
 }
 
+void workbook::save(const filesystem::path& fn) const {
+    impl->save(fn);
+}
+
 row& sheet::add_row() {
     return *rows.emplace(rows.end(), *this, rows.size() + 1);
 }
 
-shared_string workbook::get_shared_string(const string& s) {
+shared_string workbook_pimpl::get_shared_string(const string& s) {
     shared_string ss;
 
     if (shared_strings.count(s) != 0)
@@ -700,6 +708,14 @@ time::time(time_t tt) {
     hour = local_tm.tm_hour;
     minute = local_tm.tm_min;
     second = local_tm.tm_sec;
+}
+
+workbook::workbook() {
+    impl = new workbook_pimpl;
+}
+
+workbook::~workbook() {
+    delete impl;
 }
 
 }
