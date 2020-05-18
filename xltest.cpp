@@ -14,7 +14,10 @@ static void main2() {
     row.add_cell(3);
 
     auto& row2 = sh.add_row();
-    row2.add_cell("hello");
+
+    auto& c = row2.add_cell("hello");
+    c.set_font("Comic Sans MS", 12);
+
     row2.add_cell(42.1);
     row2.add_cell(xlcpp::date{1998, 7, 5});
     row2.add_cell(xlcpp::time{12, 34, 56});

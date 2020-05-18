@@ -19,11 +19,34 @@ struct shared_string {
     unsigned int num;
 };
 
+class font {
+public:
+    font(const std::string& font_name, unsigned int font_size) : font_name(font_name), font_size(font_size) { }
+
+    std::string font_name;
+    unsigned int font_size;
+};
+
+class font_hash {
+public:
+    size_t operator()(const font& f) const {
+        return std::hash<std::string>{}(f.font_name) |
+            (std::hash<unsigned int>{}(f.font_size) << 1);
+    }
+};
+
+bool operator==(const font& lhs, const font& rhs) noexcept;
+
 class style {
 public:
-    style(const std::string& number_format) : number_format(number_format) { }
+    style(const std::string& number_format, const std::string& font, unsigned int font_size) :
+        number_format(number_format), font(font, font_size) { }
+
+    void set_font(const std::string& font_name, unsigned int font_size);
 
     std::string number_format;
+    xlcpp::font font;
+
     mutable unsigned int num;
     mutable unsigned int number_format_num;
 };
@@ -31,7 +54,8 @@ public:
 class style_hash {
 public:
     size_t operator()(const style& s) const {
-        return std::hash<std::string>{}(s.number_format);
+        return std::hash<std::string>{}(s.number_format) |
+            (font_hash{}(s.font) << 1);
     }
 };
 
@@ -137,6 +161,7 @@ public:
     cell(row& r, unsigned int num, const date& val);
     cell(row& r, unsigned int num, const time& val);
     void set_number_format(const std::string& fmt);
+    void set_font(const std::string& name, unsigned int size);
 
     row& parent;
 

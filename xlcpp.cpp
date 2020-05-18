@@ -453,6 +453,8 @@ void workbook::write_styles(struct archive* a) const {
         vector<unsigned int> number_format_nums;
         unordered_map<string, unsigned int> number_formats;
         vector<const string*> number_formats2;
+        unordered_map<font, unsigned int, font_hash> fonts;
+        vector<const font*> fonts2;
 
         writer.start_document();
 
@@ -464,6 +466,11 @@ void workbook::write_styles(struct archive* a) const {
                 number_formats[s.number_format] = number_formats.size();
                 number_formats2.emplace_back(&s.number_format);
             }
+
+            if (fonts.find(s.font) == fonts.end()) {
+                fonts[s.font] = fonts.size();
+                fonts2.emplace_back(&s.font);
+            }
         }
 
         writer.start_element("numFmts");
@@ -473,6 +480,25 @@ void workbook::write_styles(struct archive* a) const {
             writer.start_element("numFmt");
             writer.attribute("numFmtId", to_string(i));
             writer.attribute("formatCode", *number_formats2[i]);
+            writer.end_element();
+        }
+
+        writer.end_element();
+
+        writer.start_element("fonts");
+        writer.attribute("count", to_string(fonts.size()));
+
+        for (unsigned int i = 0; i < fonts.size(); i++) {
+            writer.start_element("font");
+
+            writer.start_element("sz");
+            writer.attribute("val", to_string(fonts2[i]->font_size));
+            writer.end_element();
+
+            writer.start_element("name");
+            writer.attribute("val", fonts2[i]->font_name);
+            writer.end_element();
+
             writer.end_element();
         }
 
@@ -496,6 +522,8 @@ void workbook::write_styles(struct archive* a) const {
         for (const auto& s : sty) {
             writer.start_element("xf");
             writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
+            writer.attribute("fontId", to_string(fonts[s->font]));
+            writer.attribute("applyFont", "true"); // FIXME - "false" if not specified explicitly?
             writer.end_element();
         }
 
@@ -565,25 +593,25 @@ shared_string workbook::get_shared_string(const string& s) {
 }
 
 cell::cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("General"));
+    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
 cell::cell(row& r, unsigned int num, const string& val) : parent(r), num(num) {
     this->val = parent.parent.parent.get_shared_string(val);
 
-    sty = parent.parent.parent.find_style(style("General"));
+    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
 cell::cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("General"));
+    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
 cell::cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("dd/mm/yy")); // FIXME - localization
+    sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
 }
 
 cell::cell(row& r, unsigned int num, const time& val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("HH:MM:SS")); // FIXME - localization
+    sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
 }
 
 unsigned int date::to_number() const {
@@ -599,12 +627,30 @@ unsigned int date::to_number() const {
     return n;
 }
 
+bool operator==(const font& lhs, const font& rhs) noexcept {
+    return lhs.font_name == rhs.font_name &&
+        lhs.font_size == rhs.font_size;
+}
+
 bool operator==(const style& lhs, const style& rhs) noexcept {
-    return lhs.number_format == rhs.number_format;
+    return lhs.number_format == rhs.number_format &&
+        lhs.font == rhs.font;
 }
 
 double time::to_number() const {
     return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
+}
+
+void style::set_font(const std::string& font_name, unsigned int font_size) {
+    this->font = xlcpp::font(font_name, font_size);
+}
+
+void cell::set_font(const std::string& name, unsigned int size) {
+    auto sty2 = *sty;
+
+    sty2.set_font(name, size);
+
+    sty = parent.parent.parent.find_style(sty2);
 }
 
 }
