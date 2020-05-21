@@ -5,55 +5,6 @@
 
 namespace xlcpp {
 
-struct shared_string {
-    unsigned int num;
-};
-
-class font {
-public:
-    font(const std::string& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
-
-    std::string font_name;
-    unsigned int font_size;
-    bool bold;
-};
-
-class font_hash {
-public:
-    size_t operator()(const font& f) const {
-        return std::hash<std::string>{}(f.font_name) |
-            (std::hash<unsigned int>{}(f.font_size) << 1) |
-            (std::hash<bool>{}(f.bold) << 2);
-    }
-};
-
-bool operator==(const font& lhs, const font& rhs) noexcept;
-
-class style {
-public:
-    style(const std::string& number_format, const std::string& font, unsigned int font_size, bool bold = false) :
-        number_format(number_format), font(font, font_size, bold) { }
-
-    void set_font(const std::string& font_name, unsigned int font_size, bool bold);
-    void set_number_format(const std::string& fmt);
-
-    std::string number_format;
-    xlcpp::font font;
-
-    mutable unsigned int num;
-    mutable unsigned int number_format_num;
-};
-
-class style_hash {
-public:
-    size_t operator()(const style& s) const {
-        return std::hash<std::string>{}(s.number_format) |
-            (font_hash{}(s.font) << 1);
-    }
-};
-
-bool operator==(const style& lhs, const style& rhs) noexcept;
-
 class sheet;
 class cell;
 
