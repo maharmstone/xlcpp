@@ -1,6 +1,7 @@
 #pragma once
 
 #include "xlcpp.h"
+#include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <archive.h>
@@ -31,8 +32,6 @@ public:
         return &(*ret.first);
     }
 
-    friend cell;
-
     std::list<sheet> sheets;
     std::unordered_map<std::string, shared_string> shared_strings;
     std::unordered_set<style, style_hash> styles;
@@ -46,13 +45,24 @@ public:
     std::string xml() const;
     row& add_row();
 
-    friend workbook_pimpl;
-    friend cell;
-
     workbook_pimpl& parent;
     std::string name;
     unsigned int num;
     std::list<row> rows;
+};
+
+class row_pimpl {
+public:
+    row_pimpl(sheet_pimpl& s, unsigned int num) : parent(s), num(num) { }
+
+    template<typename T>
+    cell& add_cell(const T& val) {
+        return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
+    }
+
+    sheet_pimpl& parent;
+    unsigned int num;
+    std::list<cell> cells;
 };
 
 };

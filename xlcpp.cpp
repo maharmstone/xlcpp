@@ -119,7 +119,7 @@ string sheet_pimpl::xml() const {
     for (const auto& r : rows) {
         writer.start_element("row");
 
-        writer.attribute("r", to_string(r.num));
+        writer.attribute("r", to_string(r.impl->num));
         writer.attribute("customFormat", "false");
         writer.attribute("ht", "12.8");
         writer.attribute("hidden", "false");
@@ -127,10 +127,10 @@ string sheet_pimpl::xml() const {
         writer.attribute("outlineLevel", "0");
         writer.attribute("collapsed", "false");
 
-        for (const auto& c : r.cells) {
+        for (const auto& c : r.impl->cells) {
             writer.start_element("c");
 
-            writer.attribute("r", make_reference(r.num, c.num));
+            writer.attribute("r", make_reference(r.impl->num, c.num));
             writer.attribute("s", to_string(c.sty->num));
 
             if (holds_alternative<int>(c.val)) {
@@ -616,29 +616,29 @@ shared_string workbook_pimpl::get_shared_string(const string& s) {
     return ss;
 }
 
-cell::cell(row& r, unsigned int num, int val) : parent(r), num(num), val(val) {
+cell::cell(row_pimpl& r, unsigned int num, int val) : parent(r), num(num), val(val) {
     sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
-cell::cell(row& r, unsigned int num, const string& val) : parent(r), num(num) {
+cell::cell(row_pimpl& r, unsigned int num, const string& val) : parent(r), num(num) {
     this->val = parent.parent.parent.get_shared_string(val);
 
     sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
-cell::cell(row& r, unsigned int num, double val) : parent(r), num(num), val(val) {
+cell::cell(row_pimpl& r, unsigned int num, double val) : parent(r), num(num), val(val) {
     sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
-cell::cell(row& r, unsigned int num, const date& val) : parent(r), num(num), val(val) {
+cell::cell(row_pimpl& r, unsigned int num, const date& val) : parent(r), num(num), val(val) {
     sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
 }
 
-cell::cell(row& r, unsigned int num, const time& val) : parent(r), num(num), val(val) {
+cell::cell(row_pimpl& r, unsigned int num, const time& val) : parent(r), num(num), val(val) {
     sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
 }
 
-cell::cell(row& r, unsigned int num, const datetime& val) : parent(r), num(num), val(val) {
+cell::cell(row_pimpl& r, unsigned int num, const datetime& val) : parent(r), num(num), val(val) {
     sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
 }
 
@@ -728,6 +728,42 @@ sheet::sheet(workbook_pimpl& wb, const std::string& name, unsigned int num) {
 
 sheet::~sheet() {
     delete impl;
+}
+
+row::row(sheet_pimpl& s, unsigned int num) {
+    impl = new row_pimpl(s, num);
+}
+
+row::~row() {
+    delete impl;
+}
+
+cell& row::add_cell(int val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(const std::string& val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(double val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(const date& val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(const time& val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(const datetime& val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(const chrono::system_clock::time_point& val) {
+    return impl->add_cell(val);
 }
 
 }

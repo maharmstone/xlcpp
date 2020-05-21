@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <list>
 #include <chrono>
 #include <variant>
 
@@ -121,35 +120,33 @@ class cell;
 
 class row {
 public:
-    row(sheet_pimpl& s, unsigned int num) : parent(s), num(num) { }
+    row(sheet_pimpl& s, unsigned int num);
+    ~row();
 
-    template<typename T>
-    cell& add_cell(const T& val) {
-        return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
-    }
+    cell& add_cell(int val);
+    cell& add_cell(const std::string& val);
+    cell& add_cell(double val);
+    cell& add_cell(const date& val);
+    cell& add_cell(const time& val);
+    cell& add_cell(const datetime& val);
+    cell& add_cell(const std::chrono::system_clock::time_point& val);
 
-    sheet_pimpl& parent;
-
-private:
-    friend sheet_pimpl;
-
-    unsigned int num;
-    std::list<cell> cells;
+    class row_pimpl* impl;
 };
 
 class cell {
 public:
-    cell(row& r, unsigned int num, int val);
-    cell(row& r, unsigned int num, const std::string& val);
-    cell(row& r, unsigned int num, double val);
-    cell(row& r, unsigned int num, const date& val);
-    cell(row& r, unsigned int num, const time& val);
-    cell(row& r, unsigned int num, const datetime& val);
-    cell(row& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell(r, num, datetime{val}) { }
+    cell(row_pimpl& r, unsigned int num, int val);
+    cell(row_pimpl& r, unsigned int num, const std::string& val);
+    cell(row_pimpl& r, unsigned int num, double val);
+    cell(row_pimpl& r, unsigned int num, const date& val);
+    cell(row_pimpl& r, unsigned int num, const time& val);
+    cell(row_pimpl& r, unsigned int num, const datetime& val);
+    cell(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell(r, num, datetime{val}) { }
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
 
-    row& parent;
+    row_pimpl& parent;
 
 private:
     friend sheet_pimpl;
