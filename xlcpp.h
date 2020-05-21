@@ -5,10 +5,6 @@
 #include <chrono>
 #include <variant>
 
-// FIXME - remove these from public headers
-#include <archive.h>
-#include <archive_entry.h>
-
 // FIXME - private implementations
 
 namespace xlcpp {
