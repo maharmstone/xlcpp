@@ -38,4 +38,21 @@ public:
     std::unordered_set<style, style_hash> styles;
 };
 
+class sheet_pimpl {
+public:
+    sheet_pimpl(workbook_pimpl& wb, const std::string& name, unsigned int num) : parent(wb), name(name), num(num) { }
+
+    void write(struct archive* a) const;
+    std::string xml() const;
+    row& add_row();
+
+    friend workbook_pimpl;
+    friend cell;
+
+    workbook_pimpl& parent;
+    std::string name;
+    unsigned int num;
+    std::list<row> rows;
+};
+
 };

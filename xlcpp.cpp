@@ -107,7 +107,7 @@ static string make_reference(unsigned int row, unsigned int col) {
     return string(colstr) + to_string(row);
 }
 
-string sheet::xml() const {
+string sheet_pimpl::xml() const {
     xml_writer writer;
 
     writer.start_document();
@@ -187,7 +187,7 @@ string sheet::xml() const {
     return writer.dump();
 }
 
-void sheet::write(struct archive* a) const {
+void sheet_pimpl::write(struct archive* a) const {
     struct archive_entry* entry;
     string data = xml();
 
@@ -221,10 +221,10 @@ void workbook_pimpl::write_workbook_xml(struct archive* a) const {
 
         for (const auto& sh : sheets) {
             writer.start_element("sheet");
-            writer.attribute("name", sh.name);
-            writer.attribute("sheetId", to_string(sh.num));
+            writer.attribute("name", sh.impl->name);
+            writer.attribute("sheetId", to_string(sh.impl->num));
             writer.attribute("state", "visible");
-            writer.attribute("r:id", "rId" + to_string(sh.num));
+            writer.attribute("r:id", "rId" + to_string(sh.impl->num));
             writer.end_element();
         }
 
@@ -266,7 +266,7 @@ void workbook_pimpl::write_content_types_xml(struct archive* a) const {
 
         for (const auto& sh : sheets) {
             writer.start_element("Override");
-            writer.attribute("PartName", "/xl/worksheets/sheet" + to_string(sh.num) + ".xml");
+            writer.attribute("PartName", "/xl/worksheets/sheet" + to_string(sh.impl->num) + ".xml");
             writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml");
             writer.end_element();
         }
@@ -364,7 +364,7 @@ void workbook_pimpl::write_workbook_rels(struct archive* a) const {
             writer.start_element("Relationship");
             writer.attribute("Id", "rId" + to_string(num));
             writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
-            writer.attribute("Target", "worksheets/sheet" + to_string(sh.num) + ".xml");
+            writer.attribute("Target", "worksheets/sheet" + to_string(sh.impl->num) + ".xml");
             writer.end_element();
             num++;
         }
@@ -573,7 +573,7 @@ void workbook_pimpl::save(const filesystem::path& fn) const {
     archive_write_open_filename(a, fn.u8string().c_str());
 
     for (const auto& sh : sheets) {
-        sh.write(a);
+        sh.impl->write(a);
     }
 
     write_workbook_xml(a);
@@ -595,8 +595,12 @@ void workbook::save(const filesystem::path& fn) const {
     impl->save(fn);
 }
 
-row& sheet::add_row() {
+row& sheet_pimpl::add_row() {
     return *rows.emplace(rows.end(), *this, rows.size() + 1);
+}
+
+row& sheet::add_row() {
+    return impl->add_row();
 }
 
 shared_string workbook_pimpl::get_shared_string(const string& s) {
@@ -715,6 +719,14 @@ workbook::workbook() {
 }
 
 workbook::~workbook() {
+    delete impl;
+}
+
+sheet::sheet(workbook_pimpl& wb, const std::string& name, unsigned int num) {
+    impl = new sheet_pimpl(wb, name, num);
+}
+
+sheet::~sheet() {
     delete impl;
 }
 

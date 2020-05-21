@@ -74,9 +74,6 @@ public:
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
 
-private:
-    friend cell;
-
     class workbook_pimpl* impl;
 };
 
@@ -84,20 +81,11 @@ class row;
 
 class sheet {
 public:
-    sheet(workbook_pimpl& wb, const std::string& name, unsigned int num) : parent(wb), name(name), num(num) { }
+    sheet(workbook_pimpl& wb, const std::string& name, unsigned int num);
+    ~sheet();
     row& add_row();
 
-private:
-    void write(struct archive* a) const;
-    std::string xml() const;
-
-    friend workbook_pimpl;
-    friend cell;
-
-    workbook_pimpl& parent;
-    std::string name;
-    unsigned int num;
-    std::list<row> rows;
+    class sheet_pimpl* impl;
 };
 
 class date {
@@ -137,17 +125,17 @@ class cell;
 
 class row {
 public:
-    row(sheet& s, unsigned int num) : parent(s), num(num) { }
+    row(sheet_pimpl& s, unsigned int num) : parent(s), num(num) { }
 
     template<typename T>
     cell& add_cell(const T& val) {
         return *cells.emplace(cells.end(), *this, cells.size() + 1, val);
     }
 
-    sheet& parent;
+    sheet_pimpl& parent;
 
 private:
-    friend sheet;
+    friend sheet_pimpl;
 
     unsigned int num;
     std::list<cell> cells;
@@ -168,7 +156,7 @@ public:
     row& parent;
 
 private:
-    friend sheet;
+    friend sheet_pimpl;
 
     const style* sty;
 
