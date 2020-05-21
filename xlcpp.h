@@ -5,10 +5,8 @@
 
 namespace xlcpp {
 
-class sheet;
-class cell;
-
 class workbook_pimpl;
+class sheet;
 
 class workbook {
 public:
@@ -17,9 +15,10 @@ public:
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
 
-    class workbook_pimpl* impl;
+    workbook_pimpl* impl;
 };
 
+class sheet_pimpl;
 class row;
 
 class sheet {
@@ -28,7 +27,7 @@ public:
     ~sheet();
     row& add_row();
 
-    class sheet_pimpl* impl;
+    sheet_pimpl* impl;
 };
 
 class date {
@@ -64,23 +63,8 @@ public:
     time t;
 };
 
-class cell;
-
-class row {
-public:
-    row(sheet_pimpl& s, unsigned int num);
-    ~row();
-
-    cell& add_cell(int val);
-    cell& add_cell(const std::string& val);
-    cell& add_cell(double val);
-    cell& add_cell(const date& val);
-    cell& add_cell(const time& val);
-    cell& add_cell(const datetime& val);
-    cell& add_cell(const std::chrono::system_clock::time_point& val);
-
-    class row_pimpl* impl;
-};
+class row_pimpl;
+class cell_pimpl;
 
 class cell {
 public:
@@ -95,7 +79,23 @@ public:
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
 
-    class cell_pimpl* impl;
+    cell_pimpl* impl;
+};
+
+class row {
+public:
+    row(sheet_pimpl& s, unsigned int num);
+    ~row();
+
+    cell& add_cell(int val);
+    cell& add_cell(const std::string& val);
+    cell& add_cell(double val);
+    cell& add_cell(const date& val);
+    cell& add_cell(const time& val);
+    cell& add_cell(const datetime& val);
+    cell& add_cell(const std::chrono::system_clock::time_point& val);
+
+    row_pimpl* impl;
 };
 
 };
