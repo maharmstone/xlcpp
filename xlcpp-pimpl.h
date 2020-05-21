@@ -2,6 +2,7 @@
 
 #include "xlcpp.h"
 #include <list>
+#include <variant>
 #include <unordered_map>
 #include <unordered_set>
 #include <archive.h>
@@ -63,6 +64,24 @@ public:
     sheet_pimpl& parent;
     unsigned int num;
     std::list<cell> cells;
+};
+
+class cell_pimpl {
+public:
+    template<typename T>
+    cell_pimpl(row_pimpl& r, unsigned int num, const T& t);
+
+    cell_pimpl(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell_pimpl(r, num, datetime{val}) { }
+
+    void set_number_format(const std::string& fmt);
+    void set_font(const std::string& name, unsigned int size, bool bold = false);
+
+    row_pimpl& parent;
+
+    const style* sty;
+
+    unsigned int num;
+    std::variant<int, shared_string, double, date, time, datetime> val;
 };
 
 };

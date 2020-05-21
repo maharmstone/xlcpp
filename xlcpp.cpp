@@ -130,44 +130,44 @@ string sheet_pimpl::xml() const {
         for (const auto& c : r.impl->cells) {
             writer.start_element("c");
 
-            writer.attribute("r", make_reference(r.impl->num, c.num));
-            writer.attribute("s", to_string(c.sty->num));
+            writer.attribute("r", make_reference(r.impl->num, c.impl->num));
+            writer.attribute("s", to_string(c.impl->sty->num));
 
-            if (holds_alternative<int>(c.val)) {
+            if (holds_alternative<int>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<int>(c.val)));
+                writer.text(to_string(get<int>(c.impl->val)));
                 writer.end_element();
-            } else if (holds_alternative<shared_string>(c.val)) {
+            } else if (holds_alternative<shared_string>(c.impl->val)) {
                 writer.attribute("t", "s"); // shared string
 
                 writer.start_element("v");
-                writer.text(to_string(get<shared_string>(c.val).num));
+                writer.text(to_string(get<shared_string>(c.impl->val).num));
                 writer.end_element();
-            } else if (holds_alternative<double>(c.val)) {
+            } else if (holds_alternative<double>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<double>(c.val)));
+                writer.text(to_string(get<double>(c.impl->val)));
                 writer.end_element();
-            } else if (holds_alternative<date>(c.val)) {
+            } else if (holds_alternative<date>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<date>(c.val).to_number()));
+                writer.text(to_string(get<date>(c.impl->val).to_number()));
                 writer.end_element();
-            } else if (holds_alternative<time>(c.val)) {
+            } else if (holds_alternative<time>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<time>(c.val).to_number()));
+                writer.text(to_string(get<time>(c.impl->val).to_number()));
                 writer.end_element();
-            } else if (holds_alternative<datetime>(c.val)) {
+            } else if (holds_alternative<datetime>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<datetime>(c.val).to_number()));
+                writer.text(to_string(get<datetime>(c.impl->val).to_number()));
                 writer.end_element();
             } else
                 throw runtime_error("Unknown type for cell.");
@@ -616,30 +616,48 @@ shared_string workbook_pimpl::get_shared_string(const string& s) {
     return ss;
 }
 
-cell::cell(row_pimpl& r, unsigned int num, int val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
+template<typename T>
+cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), num(num), val(t) {
+    if constexpr (std::is_same_v<T, date>)
+        sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
+    else if constexpr (std::is_same_v<T, time>)
+        sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
+    else if constexpr (std::is_same_v<T, datetime>)
+        sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
+    else
+        sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const string& val) : parent(r), num(num) {
-    this->val = parent.parent.parent.get_shared_string(val);
-
-    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
+template<>
+cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const string& t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
 }
 
-cell::cell(row_pimpl& r, unsigned int num, double val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("General", "Arial", 10));
+cell::cell(row_pimpl& r, unsigned int num, int val) {
+    impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const date& val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
+cell::cell(row_pimpl& r, unsigned int num, const string& val) {
+    impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const time& val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
+cell::cell(row_pimpl& r, unsigned int num, double val) {
+    impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const datetime& val) : parent(r), num(num), val(val) {
-    sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
+cell::cell(row_pimpl& r, unsigned int num, const date& val) {
+    impl = new cell_pimpl(r, num, val);
+}
+
+cell::cell(row_pimpl& r, unsigned int num, const time& val) {
+    impl = new cell_pimpl(r, num, val);
+}
+
+cell::cell(row_pimpl& r, unsigned int num, const datetime& val) {
+    impl = new cell_pimpl(r, num, val);
+}
+
+cell::cell(row_pimpl& r, unsigned int num, const chrono::system_clock::time_point& val) {
+    impl = new cell_pimpl(r, num, val);
 }
 
 unsigned int date::to_number() const {
@@ -682,7 +700,7 @@ void style::set_number_format(const std::string& fmt) {
     number_format = fmt;
 }
 
-void cell::set_font(const std::string& name, unsigned int size, bool bold) {
+void cell_pimpl::set_font(const std::string& name, unsigned int size, bool bold) {
     auto sty2 = *sty;
 
     sty2.set_font(name, size, bold);
@@ -690,12 +708,20 @@ void cell::set_font(const std::string& name, unsigned int size, bool bold) {
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_number_format(const std::string& fmt) {
+void cell::set_font(const std::string& name, unsigned int size, bool bold) {
+    impl->set_font(name, size, bold);
+}
+
+void cell_pimpl::set_number_format(const std::string& fmt) {
     auto sty2 = *sty;
 
     sty2.set_number_format(fmt);
 
     sty = parent.parent.parent.find_style(sty2);
+}
+
+void cell::set_number_format(const std::string& fmt) {
+    impl->set_number_format(fmt);
 }
 
 date::date(time_t tt) {

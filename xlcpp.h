@@ -2,9 +2,6 @@
 
 #include <filesystem>
 #include <chrono>
-#include <variant>
-
-// FIXME - private implementations
 
 namespace xlcpp {
 
@@ -142,19 +139,12 @@ public:
     cell(row_pimpl& r, unsigned int num, const date& val);
     cell(row_pimpl& r, unsigned int num, const time& val);
     cell(row_pimpl& r, unsigned int num, const datetime& val);
-    cell(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell(r, num, datetime{val}) { }
+    cell(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val);
+
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
 
-    row_pimpl& parent;
-
-private:
-    friend sheet_pimpl;
-
-    const style* sty;
-
-    unsigned int num;
-    std::variant<int, shared_string, double, date, time, datetime> val;
+    class cell_pimpl* impl;
 };
 
 };
