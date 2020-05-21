@@ -63,6 +63,7 @@ class workbook_pimpl {
 public:
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
+    std::string data() const;
 
     void write_workbook_xml(struct archive* a) const;
     void write_content_types_xml(struct archive* a) const;
@@ -71,6 +72,8 @@ public:
     shared_string get_shared_string(const std::string& s);
     void write_shared_strings(struct archive* a) const;
     void write_styles(struct archive* a) const;
+    void write_archive(struct archive* a) const;
+    ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
 
     template<class... Args>
     const style* find_style(Args&&... args) {
@@ -85,6 +88,8 @@ public:
     std::list<sheet> sheets;
     std::unordered_map<std::string, shared_string> shared_strings;
     std::unordered_set<style, style_hash> styles;
+
+    mutable std::string buf;
 };
 
 class sheet_pimpl {

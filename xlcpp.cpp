@@ -564,14 +564,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
     archive_entry_free(entry);
 }
 
-void workbook_pimpl::save(const filesystem::path& fn) const {
-    struct archive* a;
-
-    a = archive_write_new();
-    archive_write_set_format_zip(a);
-
-    archive_write_open_filename(a, fn.u8string().c_str());
-
+void workbook_pimpl::write_archive(struct archive* a) const {
     for (const auto& sh : sheets) {
         sh.impl->write(a);
     }
@@ -586,6 +579,17 @@ void workbook_pimpl::save(const filesystem::path& fn) const {
 
     if (!styles.empty())
         write_styles(a);
+}
+
+void workbook_pimpl::save(const filesystem::path& fn) const {
+    struct archive* a;
+
+    a = archive_write_new();
+    archive_write_set_format_zip(a);
+
+    archive_write_open_filename(a, fn.u8string().c_str());
+
+    write_archive(a);
 
     archive_write_close(a);
     archive_write_free(a);
@@ -593,6 +597,55 @@ void workbook_pimpl::save(const filesystem::path& fn) const {
 
 void workbook::save(const filesystem::path& fn) const {
     impl->save(fn);
+}
+
+static int archive_dummy_callback(struct archive* a, void* client_data) {
+    return ARCHIVE_OK;
+}
+
+ssize_t workbook_pimpl::write_callback(struct archive* a, const void* buffer, size_t length) const {
+    buf.append((const char*)buffer, length);
+
+    return length;
+}
+
+string workbook_pimpl::data() const {
+    struct archive* a;
+    int ret;
+
+    buf.clear();
+
+    a = archive_write_new();
+
+    try {
+        archive_write_set_format_zip(a);
+        archive_write_set_bytes_in_last_block(a, 1);
+
+        ret = archive_write_open(a, (void*)this, archive_dummy_callback,
+                                [](struct archive* a, void* client_data, const void* buffer, size_t length) {
+                                    auto wb = (const workbook_pimpl*)client_data;
+
+                                    return wb->write_callback(a, buffer, length);
+                                },
+                                archive_dummy_callback);
+        if (ret != ARCHIVE_OK)
+            throw runtime_error("archive_write_open returned " + to_string(ret) + ".");
+
+        write_archive(a);
+
+        archive_write_close(a);
+    } catch (...) {
+        archive_write_free(a);
+        throw;
+    }
+
+    archive_write_free(a);
+
+    return buf;
+}
+
+string workbook::data() const {
+    return impl->data();
 }
 
 row& sheet_pimpl::add_row() {

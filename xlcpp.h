@@ -14,6 +14,7 @@ public:
     ~workbook();
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
+    std::string data() const;
 
     workbook_pimpl* impl;
 };

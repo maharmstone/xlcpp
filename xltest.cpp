@@ -30,6 +30,9 @@ static void main2() {
     row2.add_cell(chrono::system_clock::now());
 
     wb.save("out.xlsx");
+
+//     auto res = wb.data();
+//     cout << res;
 }
 
 int main() {
