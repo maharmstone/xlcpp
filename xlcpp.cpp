@@ -555,7 +555,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
                 writer.start_element("xf");
                 writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
                 writer.attribute("fontId", to_string(fonts[s->font]));
-                writer.attribute("applyFont", "true"); // FIXME - "false" if not specified explicitly?
+                writer.attribute("applyFont", "1"); // FIXME - "0" if not specified explicitly?
                 writer.attribute("xfId", to_string(style_id));
                 writer.end_element();
 
