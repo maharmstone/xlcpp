@@ -133,11 +133,11 @@ string sheet_pimpl::xml() const {
             writer.attribute("r", make_reference(r.impl->num, c.impl->num));
             writer.attribute("s", to_string(c.impl->sty->num));
 
-            if (holds_alternative<int>(c.impl->val)) {
+            if (holds_alternative<int64_t>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<int>(c.impl->val)));
+                writer.text(to_string(get<int64_t>(c.impl->val)));
                 writer.end_element();
             } else if (holds_alternative<shared_string>(c.impl->val)) {
                 writer.attribute("t", "s"); // shared string
@@ -685,7 +685,7 @@ template<>
 cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const string& t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
 }
 
-cell::cell(row_pimpl& r, unsigned int num, int val) {
+cell::cell(row_pimpl& r, unsigned int num, int64_t val) {
     impl = new cell_pimpl(r, num, val);
 }
 
@@ -817,7 +817,7 @@ row::~row() {
     delete impl;
 }
 
-cell& row::add_cell(int val) {
+cell& row::add_cell(int64_t val) {
     return impl->add_cell(val);
 }
 

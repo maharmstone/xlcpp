@@ -69,7 +69,7 @@ class cell_pimpl;
 
 class cell {
 public:
-    cell(row_pimpl& r, unsigned int num, int val);
+    cell(row_pimpl& r, unsigned int num, int64_t val);
     cell(row_pimpl& r, unsigned int num, const std::string& val);
     cell(row_pimpl& r, unsigned int num, double val);
     cell(row_pimpl& r, unsigned int num, const date& val);
@@ -88,13 +88,17 @@ public:
     row(sheet_pimpl& s, unsigned int num);
     ~row();
 
-    cell& add_cell(int val);
+    cell& add_cell(int64_t val);
     cell& add_cell(const std::string& val);
     cell& add_cell(double val);
     cell& add_cell(const date& val);
     cell& add_cell(const time& val);
     cell& add_cell(const datetime& val);
     cell& add_cell(const std::chrono::system_clock::time_point& val);
+
+    cell& add_cell(int val) {
+        return add_cell((int64_t)val);
+    }
 
     row_pimpl* impl;
 };
