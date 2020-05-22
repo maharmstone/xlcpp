@@ -76,6 +76,7 @@ public:
     cell(row_pimpl& r, unsigned int num, const time& val);
     cell(row_pimpl& r, unsigned int num, const datetime& val);
     cell(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val);
+    cell(row_pimpl& r, unsigned int num, bool val);
 
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
@@ -95,6 +96,11 @@ public:
     cell& add_cell(const time& val);
     cell& add_cell(const datetime& val);
     cell& add_cell(const std::chrono::system_clock::time_point& val);
+    cell& add_cell(bool val);
+
+    cell& add_cell(const char* val) {
+        return add_cell(std::string(val));
+    }
 
     cell& add_cell(int val) {
         return add_cell((int64_t)val);

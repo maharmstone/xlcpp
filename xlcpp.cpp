@@ -169,6 +169,12 @@ string sheet_pimpl::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<datetime>(c.impl->val).to_number()));
                 writer.end_element();
+            } else if (holds_alternative<bool>(c.impl->val)) {
+                writer.attribute("t", "b"); // bool
+
+                writer.start_element("v");
+                writer.text(to_string(get<bool>(c.impl->val)));
+                writer.end_element();
             } else
                 throw runtime_error("Unknown type for cell.");
 
@@ -713,6 +719,10 @@ cell::cell(row_pimpl& r, unsigned int num, const chrono::system_clock::time_poin
     impl = new cell_pimpl(r, num, val);
 }
 
+cell::cell(row_pimpl& r, unsigned int num, bool val) {
+    impl = new cell_pimpl(r, num, val);
+}
+
 unsigned int date::to_number() const {
     int m2 = ((int)month - 14) / 12;
     long long n;
@@ -842,6 +852,10 @@ cell& row::add_cell(const datetime& val) {
 }
 
 cell& row::add_cell(const chrono::system_clock::time_point& val) {
+    return impl->add_cell(val);
+}
+
+cell& row::add_cell(bool val) {
     return impl->add_cell(val);
 }
 
