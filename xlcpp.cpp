@@ -527,30 +527,43 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         writer.end_element();
 
-        writer.start_element("cellStyleXfs");
-        writer.attribute("count", "1");
-        writer.start_element("xf");
-        writer.end_element();
-        writer.end_element();
-
         sty.resize(styles.size());
 
         for (const auto& s : styles) {
             sty[s.num] = &s;
         }
 
-        writer.start_element("cellXfs");
+        writer.start_element("cellStyleXfs");
         writer.attribute("count", to_string(styles.size()));
 
         for (const auto& s : sty) {
             writer.start_element("xf");
             writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
             writer.attribute("fontId", to_string(fonts[s->font]));
-            writer.attribute("applyFont", "true"); // FIXME - "false" if not specified explicitly?
             writer.end_element();
         }
 
         writer.end_element();
+
+        {
+            unsigned int style_id = 0;
+
+            writer.start_element("cellXfs");
+            writer.attribute("count", to_string(styles.size()));
+
+            for (const auto& s : sty) {
+                writer.start_element("xf");
+                writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
+                writer.attribute("fontId", to_string(fonts[s->font]));
+                writer.attribute("applyFont", "true"); // FIXME - "false" if not specified explicitly?
+                writer.attribute("xfId", to_string(style_id));
+                writer.end_element();
+
+                style_id++;
+            }
+
+            writer.end_element();
+        }
 
         writer.end_element();
 
