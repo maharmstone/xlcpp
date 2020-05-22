@@ -4,6 +4,9 @@ include(GNUInstallDirs)
 
 project(xlcpp)
 
+option(BUILD_STATIC "Build static library" ON)
+option(BUILD_SAMPLE "Build sample program" ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -14,7 +17,6 @@ add_definitions(-DXLCPP_EXPORT)
 set(SRC_FILES xlcpp.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
-add_library(xlcppstatic STATIC ${SRC_FILES})
 target_link_libraries(xlcpp archive)
 
 target_compile_options(xlcpp PRIVATE
@@ -24,13 +26,19 @@ target_compile_options(xlcpp PRIVATE
 		/W4>)
 
 target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
-target_include_directories(xlcppstatic PUBLIC "${LIBXML2_INCLUDE_DIR}")
 
 install(TARGETS xlcpp DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
-install(TARGETS xlcppstatic DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(FILES xlcpp.h DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
-add_executable(xltest xltest.cpp)
-target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(xltest xlcpp)
+if(BUILD_STATIC)
+    add_library(xlcppstatic STATIC ${SRC_FILES})
+    target_include_directories(xlcppstatic PUBLIC "${LIBXML2_INCLUDE_DIR}")
+    install(TARGETS xlcppstatic DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
+endif()
 
+if(BUILD_SAMPLE)
+    add_executable(xltest xltest.cpp)
+    target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(xltest xlcpp)
+    install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
+endif()
