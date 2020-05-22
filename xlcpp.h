@@ -102,9 +102,16 @@ public:
         return add_cell(std::string(val));
     }
 
+    cell& add_cell(char* val) {
+        return add_cell(std::string(val));
+    }
+
     cell& add_cell(int val) {
         return add_cell((int64_t)val);
     }
+
+    template<typename T>
+    cell& add_cell(T* val) = delete;
 
     row_pimpl* impl;
 };
