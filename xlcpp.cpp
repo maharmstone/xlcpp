@@ -660,7 +660,7 @@ static int archive_dummy_callback(struct archive* a, void* client_data) {
     return ARCHIVE_OK;
 }
 
-ssize_t workbook_pimpl::write_callback(struct archive* a, const void* buffer, size_t length) const {
+la_ssize_t workbook_pimpl::write_callback(struct archive* a, const void* buffer, size_t length) const {
     buf.append((const char*)buffer, length);
 
     return length;

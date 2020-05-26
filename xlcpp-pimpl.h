@@ -73,7 +73,7 @@ public:
     void write_shared_strings(struct archive* a) const;
     void write_styles(struct archive* a) const;
     void write_archive(struct archive* a) const;
-    ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
+    la_ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
 
     template<class... Args>
     const style* find_style(Args&&... args) {
