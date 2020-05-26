@@ -470,6 +470,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
         vector<unsigned int> number_format_nums;
         unordered_map<string, unsigned int> number_formats;
         vector<const string*> number_formats2;
+        font default_font("Arial", 10, false);
         unordered_map<font, unsigned int, font_hash> fonts;
         vector<const font*> fonts2;
 
@@ -477,6 +478,9 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         writer.start_element("styleSheet");
         writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+
+        fonts[default_font] = 0;
+        fonts2.emplace_back(&default_font);
 
         for (const auto& s : styles) {
             if (number_formats.find(s.number_format) == number_formats.end()) {
