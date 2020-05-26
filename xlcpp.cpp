@@ -544,6 +544,19 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         writer.end_element();
 
+        writer.start_element("borders");
+        writer.attribute("count", "1");
+
+        writer.start_element("border");
+        writer.start_element("left"); writer.end_element();
+        writer.start_element("right"); writer.end_element();
+        writer.start_element("top"); writer.end_element();
+        writer.start_element("bottom"); writer.end_element();
+        writer.start_element("diagonal"); writer.end_element();
+        writer.end_element();
+
+        writer.end_element();
+
         sty.resize(styles.size());
 
         for (const auto& s : styles) {
@@ -558,6 +571,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
             writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
             writer.attribute("fontId", to_string(fonts[s->font]));
             writer.attribute("fillId", "0");
+            writer.attribute("borderId", "0");
             writer.end_element();
         }
 
@@ -574,6 +588,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
                 writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
                 writer.attribute("fontId", to_string(fonts[s->font]));
                 writer.attribute("fillId", "0");
+                writer.attribute("borderId", "0");
                 writer.attribute("applyFont", "1"); // FIXME - "0" if not specified explicitly?
                 writer.attribute("xfId", to_string(style_id));
                 writer.end_element();
