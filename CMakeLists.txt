@@ -10,14 +10,16 @@ option(BUILD_SAMPLE "Build sample program" ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(LibXml2)
+find_package(LibXml2 REQUIRED)
+find_package(LibArchive REQUIRED)
 
 add_definitions(-DXLCPP_EXPORT)
 
 set(SRC_FILES xlcpp.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
-target_link_libraries(xlcpp archive)
+target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
+target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
 
 target_compile_options(xlcpp PRIVATE
 	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
@@ -25,6 +27,7 @@ target_compile_options(xlcpp PRIVATE
 	$<$<CXX_COMPILER_ID:MSVC>:
 		/W4>)
 
+target_include_directories(xlcpp PUBLIC "${LibArchive_INCLUDE_DIR}")
 target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
 
 install(TARGETS xlcpp DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
@@ -32,6 +35,7 @@ install(FILES xlcpp.h DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
 if(BUILD_STATIC)
     add_library(xlcppstatic STATIC ${SRC_FILES})
+    target_include_directories(xlcppstatic PUBLIC "${LibArchive_INCLUDE_DIR}")
     target_include_directories(xlcppstatic PUBLIC "${LIBXML2_INCLUDE_DIR}")
     install(TARGETS xlcppstatic DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 endif()
