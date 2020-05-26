@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <chrono>
+#include <string>
 
 namespace xlcpp {
 
