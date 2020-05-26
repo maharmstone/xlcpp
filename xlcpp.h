@@ -4,12 +4,34 @@
 #include <chrono>
 #include <string>
 
+#ifdef _WIN32
+
+#ifdef XLCPP_EXPORT
+#define XLCPP __declspec(dllexport)
+#elif !defined(XLCPP_STATIC)
+#define XLCPP __declspec(dllimport)
+#else
+#define XLCPP
+#endif
+
+#else
+
+#ifdef XLCPP_EXPORT
+#define XLCPP __attribute__ ((visibility ("default")))
+#elif !defined(XLCPP_STATIC)
+#define XLCPP __attribute__ ((dllimport))
+#else
+#define XLCPP
+#endif
+
+#endif
+
 namespace xlcpp {
 
 class workbook_pimpl;
 class sheet;
 
-class workbook {
+class XLCPP workbook {
 public:
     workbook();
     ~workbook();
@@ -23,7 +45,7 @@ public:
 class sheet_pimpl;
 class row;
 
-class sheet {
+class XLCPP sheet {
 public:
     sheet(workbook_pimpl& wb, const std::string& name, unsigned int num);
     ~sheet();
@@ -32,7 +54,7 @@ public:
     sheet_pimpl* impl;
 };
 
-class date {
+class XLCPP date {
 public:
     date(unsigned int year, unsigned int month, unsigned int day) : year(year), month(month), day(day) { }
     date(time_t tt);
@@ -42,7 +64,7 @@ public:
     unsigned int year, month, day;
 };
 
-class time {
+class XLCPP time {
 public:
     time(unsigned int hour, unsigned int minute, unsigned int second) : hour(hour), minute(minute), second(second) { }
     time(time_t tt);
@@ -52,7 +74,7 @@ public:
     unsigned int hour, minute, second;
 };
 
-class datetime {
+class XLCPP datetime {
 public:
     datetime(unsigned int year, unsigned int month, unsigned int day, unsigned int hour, unsigned int minute, unsigned int second):
         d(year, month, day), t(hour, minute, second) { }
@@ -68,7 +90,7 @@ public:
 class row_pimpl;
 class cell_pimpl;
 
-class cell {
+class XLCPP cell {
 public:
     cell(row_pimpl& r, unsigned int num, int64_t val);
     cell(row_pimpl& r, unsigned int num, const std::string& val);
@@ -85,7 +107,7 @@ public:
     cell_pimpl* impl;
 };
 
-class row {
+class XLCPP row {
 public:
     row(sheet_pimpl& s, unsigned int num);
     ~row();

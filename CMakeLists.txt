@@ -9,6 +9,7 @@ option(BUILD_SAMPLE "Build sample program" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 find_package(LibXml2 REQUIRED)
 find_package(LibArchive REQUIRED)
