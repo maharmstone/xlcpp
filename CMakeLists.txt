@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 project(xlcpp)
 
@@ -23,15 +24,15 @@ target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
 
 target_compile_options(xlcpp PRIVATE
-	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-		-Wall>
-	$<$<CXX_COMPILER_ID:MSVC>:
-		/W4>)
+    $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+        -Wall>
+    $<$<CXX_COMPILER_ID:MSVC>:
+        /W4>)
 
 target_include_directories(xlcpp PUBLIC "${LibArchive_INCLUDE_DIR}")
 target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
 
-install(TARGETS xlcpp DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
+install(TARGETS xlcpp EXPORT xlcpp-targets DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(FILES xlcpp.h DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 
 if(BUILD_STATIC)
@@ -47,3 +48,12 @@ if(BUILD_SAMPLE)
     target_link_libraries(xltest xlcpp)
     install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
 endif()
+
+install(EXPORT xlcpp-targets DESTINATION lib/cmake/xlcpp)
+
+configure_package_config_file(
+    "xlcppConfig.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/xlcppConfig.cmake"
+    INSTALL_DESTINATION "lib/cmake/xlcpp"
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/xlcppConfig.cmake" DESTINATION "lib/cmake/xlcpp")
