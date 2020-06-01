@@ -10,6 +10,8 @@ using namespace std;
 class xml_writer {
 public:
     xml_writer() {
+        xmlInitParser();
+
         buf = xmlBufferCreate();
         if (!buf)
             throw runtime_error("xmlBufferCreate failed");
