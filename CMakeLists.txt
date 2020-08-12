@@ -17,7 +17,8 @@ find_package(LibArchive REQUIRED)
 
 add_definitions(-DXLCPP_EXPORT)
 
-set(SRC_FILES xlcpp.cpp)
+set(SRC_FILES xlcpp.cpp
+    xml-writer.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
