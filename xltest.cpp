@@ -36,9 +36,16 @@ static void main2() {
 //     cout << res;
 }
 
+static void read_test(const filesystem::path& fn) {
+    xlcpp::workbook wb(fn);
+
+    // FIXME
+}
+
 int main() {
     try {
         main2();
+        read_test("out.xlsx");
     } catch (const exception& e) {
         cerr << "Error: " << e.what() << endl;
         return 1;

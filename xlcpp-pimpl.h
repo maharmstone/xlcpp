@@ -61,6 +61,8 @@ bool operator==(const style& lhs, const style& rhs) noexcept;
 
 class workbook_pimpl {
 public:
+    workbook_pimpl() = default;
+    workbook_pimpl(const std::filesystem::path& fn);
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;

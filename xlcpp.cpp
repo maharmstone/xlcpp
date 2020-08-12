@@ -5,6 +5,8 @@
 #include <libxml/xmlwriter.h>
 #include <vector>
 
+#define BLOCK_SIZE 20480
+
 using namespace std;
 
 class xml_writer {
@@ -858,6 +860,52 @@ time::time(time_t tt) {
 
 workbook::workbook() {
     impl = new workbook_pimpl;
+}
+
+workbook_pimpl::workbook_pimpl(const std::filesystem::path& fn) {
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
+
+    archive_read_support_format_zip(a);
+
+    auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
+
+    if (r != ARCHIVE_OK)
+        throw runtime_error(archive_error_string(a));
+
+    unordered_map<string, string> files;
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname_utf8(entry)) {
+            filesystem::path name = archive_entry_pathname_utf8(entry);
+            auto ext = name.extension().u8string();
+
+            if (ext.length() != 4 || ext[0] != '.' || (ext[1] != 'X' && ext[1] != 'x') ||
+                (ext[2] != 'M' && ext[2] != 'm') || (ext[3] != 'L' && ext[3] != 'l')) {
+                continue;
+            }
+
+            string buf;
+            string tmp(BLOCK_SIZE, 0);
+
+            do {
+                auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
+
+                if (read == 0)
+                    break;
+
+                buf += tmp.substr(0, read);
+            } while (true);
+        }
+    }
+
+    // FIXME - process files
+
+    archive_read_free(a);
+}
+
+workbook::workbook(const filesystem::path& fn) {
+    impl = new workbook_pimpl(fn);
 }
 
 workbook::~workbook() {

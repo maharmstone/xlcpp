@@ -34,6 +34,7 @@ class sheet;
 class XLCPP workbook {
 public:
     workbook();
+    workbook(const std::filesystem::path& fn);
     ~workbook();
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
