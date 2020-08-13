@@ -5,6 +5,7 @@
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
+#include <functional>
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
@@ -171,6 +172,7 @@ public:
     bool has_attributes() const;
     bool get_attribute(unsigned int i, std::string& name, std::string& value);
     bool is_empty() const;
+    void attributes_loop(const std::function<bool(const std::string&, const std::string&)>& func);
 
 private:
     xmlParserInputBufferPtr buf;

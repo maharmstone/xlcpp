@@ -8,6 +8,11 @@
 
 using namespace std;
 
+typedef struct {
+    string content_type;
+    string data;
+} file;
+
 namespace xlcpp {
 
 sheet& workbook_pimpl::add_sheet(const string& name) {
@@ -787,44 +792,144 @@ workbook::workbook() {
     impl = new workbook_pimpl;
 }
 
+static void parse_content_types(const string& ct, unordered_map<string, file>& files) {
+    xml_reader r(ct);
+    unsigned int depth = 0;
+    unordered_map<string, string> defs, over;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                string xmlns;
+
+                if (r.name() != "Types")
+                    throw runtime_error("Root tag name was not \"Types\".");
+
+                r.attributes_loop([](const string& name, const string& value) {
+                    if (name == "xmlns") {
+                        if (value != "http://schemas.openxmlformats.org/package/2006/content-types")
+                            throw runtime_error("Root tag had wrong namespace.");
+                        return false;
+                    }
+
+                    return true;
+                });
+            } else if (depth == 1) {
+                if (r.name() == "Default") {
+                    string ext, ct;
+
+                    r.attributes_loop([&](const string& name, const string& value) {
+                        if (name == "Extension")
+                            ext = value;
+                        else if (name == "ContentType")
+                            ct = value;
+
+                        return true;
+                    });
+
+                    defs[ext] = ct;
+                } else if (r.name() == "Override") {
+                    string part, ct;
+
+                    r.attributes_loop([&](const string& name, const string& value) {
+                        if (name == "PartName")
+                            part = value;
+                        else if (name == "ContentType")
+                            ct = value;
+
+                        return true;
+                    });
+
+                    over[part] = ct;
+                }
+            }
+        }
+
+        depth = next_depth;
+    }
+
+    for (auto& f : files) {
+        for (const auto& o : over) {
+            if (o.first == "/" + f.first) {
+                f.second.content_type = o.second;
+                break;
+            }
+        }
+
+        if (!f.second.content_type.empty())
+            continue;
+
+        auto st = f.first.rfind(".");
+        string ext = st == string::npos ? "" : f.first.substr(st + 1);
+
+        for (const auto& d : defs) {
+            if (ext == d.first) {
+                f.second.content_type = d.second;
+                break;
+            }
+        }
+    }
+}
+
 workbook_pimpl::workbook_pimpl(const std::filesystem::path& fn) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
 
-    archive_read_support_format_zip(a);
+    try {
+        archive_read_support_format_zip(a);
 
-    auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
+        auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
 
-    if (r != ARCHIVE_OK)
-        throw runtime_error(archive_error_string(a));
+        if (r != ARCHIVE_OK)
+            throw runtime_error(archive_error_string(a));
 
-    unordered_map<string, string> files;
+        unordered_map<string, file> files;
 
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-        if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname_utf8(entry)) {
-            filesystem::path name = archive_entry_pathname_utf8(entry);
-            auto ext = name.extension().u8string();
+        while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname_utf8(entry)) {
+                filesystem::path name = archive_entry_pathname_utf8(entry);
+                auto ext = name.extension().u8string();
 
-            if (ext.length() != 4 || ext[0] != '.' || (ext[1] != 'X' && ext[1] != 'x') ||
-                (ext[2] != 'M' && ext[2] != 'm') || (ext[3] != 'L' && ext[3] != 'l')) {
-                continue;
+                if (ext.length() != 4 || ext[0] != '.' || (ext[1] != 'X' && ext[1] != 'x') ||
+                    (ext[2] != 'M' && ext[2] != 'm') || (ext[3] != 'L' && ext[3] != 'l')) {
+                    continue;
+                }
+
+                string buf;
+                string tmp(BLOCK_SIZE, 0);
+
+                do {
+                    auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
+
+                    if (read == 0)
+                        break;
+
+                    buf += tmp.substr(0, read);
+                } while (true);
+
+                files[name.u8string()].data = buf;
             }
-
-            string buf;
-            string tmp(BLOCK_SIZE, 0);
-
-            do {
-                auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
-
-                if (read == 0)
-                    break;
-
-                buf += tmp.substr(0, read);
-            } while (true);
         }
-    }
 
-    // FIXME - process files
+        if (files.count("[Content_Types].xml") == 0)
+            throw runtime_error("[Content_Types].xml not found.");
+
+        parse_content_types(files.at("[Content_Types].xml").data, files);
+
+        // FIXME
+    } catch (...) {
+        archive_read_free(a);
+        throw;
+    }
 
     archive_read_free(a);
 }

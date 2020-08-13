@@ -70,3 +70,18 @@ bool xml_reader::get_attribute(unsigned int i, string& name, string& value) {
 bool xml_reader::is_empty() const {
     return xmlTextReaderIsEmptyElement(reader);
 }
+
+void xml_reader::attributes_loop(const function<bool(const string&, const string&)>& func) {
+    string name, value;
+    unsigned int i = 0;
+
+    while (true) {
+        if (!get_attribute(i, name, value))
+            return;
+
+        if (!func(name, value))
+            return;
+
+        i++;
+    }
+}
