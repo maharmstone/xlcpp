@@ -8,6 +8,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
+#include <libxml/xmlreader.h>
 
 namespace xlcpp {
 
@@ -158,4 +159,20 @@ public:
 private:
     xmlBufferPtr buf;
     xmlTextWriterPtr writer;
+};
+
+class xml_reader {
+public:
+    xml_reader(const std::string_view& sv);
+    ~xml_reader();
+    bool read();
+    int node_type() const;
+    std::string name() const;
+    bool has_attributes() const;
+    bool get_attribute(unsigned int i, std::string& name, std::string& value);
+    bool is_empty() const;
+
+private:
+    xmlParserInputBufferPtr buf;
+    xmlTextReaderPtr reader;
 };
