@@ -17,6 +17,11 @@ struct shared_string {
     unsigned int num;
 };
 
+typedef struct {
+    std::string content_type;
+    std::string data;
+} file;
+
 class font {
 public:
     font(const std::string& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
@@ -79,6 +84,9 @@ public:
     void write_styles(struct archive* a) const;
     void write_archive(struct archive* a) const;
     la_ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
+    void parse_workbook(const std::string& fn, const std::string_view& data,
+                        const std::unordered_map<std::string, file>& files);
+    void load_sheet(const std::string& name, const std::string& data);
 
     template<class... Args>
     const style* find_style(Args&&... args) {

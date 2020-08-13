@@ -13,11 +13,6 @@ static const string NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/office
 static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
 static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
 
-typedef struct {
-    string content_type;
-    string data;
-} file;
-
 namespace xlcpp {
 
 sheet& workbook_pimpl::add_sheet(const string& name) {
@@ -935,10 +930,79 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
     return rels;
 }
 
-static void parse_workbook(const string& fn, const string_view& data, const unordered_map<string, file>& files) {
+void workbook_pimpl::load_sheet(const string& name, const string& data) {
+    auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
+
     xml_reader r(data);
     unsigned int depth = 0;
-    unordered_map<string, string> sheets_rels, sheets;
+    bool in_sheet_data = false;
+    unsigned int last_index = 0;
+    row* row = nullptr;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                if (r.local_name() != "worksheet" || r.namespace_uri() != NS_SPREADSHEET)
+                    throw runtime_error("Root tag name was not \"worksheet\".");
+            } else if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                in_sheet_data = true;
+            else if (in_sheet_data) {
+                if (r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET) {
+                    unsigned int row_index = 0;
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "r" && ns.empty()) {
+                            row_index = stoi(value);
+                            return false;
+                        }
+
+                        return true;
+                    });
+
+                    if (row_index == 0)
+                        throw runtime_error("No row index given.");
+
+                    if (row_index <= last_index)
+                        throw runtime_error("Rows out of order.");
+
+                    while (last_index + 1 < row_index) {
+                        s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+                        last_index++;
+                    }
+
+                    s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+
+                    row = &s.impl->rows.back();
+
+                    last_index = row_index;
+                } else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+                    // FIXME - cell
+                }
+            }
+        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
+            if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET)
+                in_sheet_data = false;
+            else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
+                row = nullptr;
+        }
+
+        depth = next_depth;
+    }
+}
+
+void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, const unordered_map<string, file>& files) {
+    xml_reader r(data);
+    unsigned int depth = 0;
+    unordered_map<string, string> sheets_rels;
 
     while (r.read()) {
         unsigned int next_depth;
@@ -977,18 +1041,28 @@ static void parse_workbook(const string& fn, const string_view& data, const unor
         depth = next_depth;
     }
 
+    // FIXME - preserve sheet order
+
     auto rels = read_relationships(fn, files);
 
     for (const auto& sr : sheets_rels) {
         for (const auto& r : rels) {
             if (r.first == sr.first) {
-                sheets[sr.second] = r.second;
+                auto name = filesystem::path(fn);
+
+                // FIXME - can we resolve relative paths properly?
+
+                name.remove_filename();
+                name /= r.second;
+
+                if (files.count(name.u8string()) == 0)
+                    throw runtime_error("File " + name.u8string() + " not found.");
+
+                load_sheet(sr.second, files.at(name.u8string()).data);
                 break;
             }
         }
     }
-
-    // FIXME - load sheets
 }
 
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
