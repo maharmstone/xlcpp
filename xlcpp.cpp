@@ -8,6 +8,11 @@
 
 using namespace std;
 
+static const string NS_SPREADSHEET = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+static const string NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
+static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
+
 typedef struct {
     string content_type;
     string data;
@@ -46,7 +51,7 @@ string sheet_pimpl::xml() const {
 
     writer.start_document();
 
-    writer.start_element("worksheet", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}});
+    writer.start_element("worksheet", {{"", NS_SPREADSHEET}});
 
     writer.start_element("sheetData");
 
@@ -151,7 +156,7 @@ void workbook_pimpl::write_workbook_xml(struct archive* a) const {
 
         writer.start_document();
 
-        writer.start_element("workbook", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}, {"r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships"}});
+        writer.start_element("workbook", {{"", NS_SPREADSHEET}, {"r", NS_RELATIONSHIPS}});
 
         writer.start_element("workbookPr");
         writer.attribute("date1904", "true");
@@ -197,7 +202,7 @@ void workbook_pimpl::write_content_types_xml(struct archive* a) const {
 
         writer.start_document();
 
-        writer.start_element("Types", {{"", "http://schemas.openxmlformats.org/package/2006/content-types"}});
+        writer.start_element("Types", {{"", NS_CONTENT_TYPES}});
 
         writer.start_element("Override");
         writer.attribute("PartName", "/xl/workbook.xml");
@@ -353,7 +358,7 @@ void workbook_pimpl::write_shared_strings(struct archive* a) const {
 
         writer.start_document();
 
-        writer.start_element("sst", {{"", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}});
+        writer.start_element("sst", {{"", NS_SPREADSHEET}});
         writer.attribute("count", to_string(shared_strings.size()));
         writer.attribute("uniqueCount", to_string(shared_strings.size()));
 
@@ -411,7 +416,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
         writer.start_document();
 
         writer.start_element("styleSheet");
-        writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+        writer.attribute("xmlns", NS_SPREADSHEET);
 
         fonts[default_font] = 0;
         fonts2.emplace_back(&default_font);
@@ -809,41 +814,29 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
 
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
-                string xmlns;
-
-                if (r.name() != "Types")
+                if (r.local_name() != "Types" || r.namespace_uri() != NS_CONTENT_TYPES)
                     throw runtime_error("Root tag name was not \"Types\".");
-
-                r.attributes_loop([](const string& name, const string& value) {
-                    if (name == "xmlns") {
-                        if (value != "http://schemas.openxmlformats.org/package/2006/content-types")
-                            throw runtime_error("Root tag had wrong namespace.");
-                        return false;
-                    }
-
-                    return true;
-                });
             } else if (depth == 1) {
-                if (r.name() == "Default") {
+                if (r.local_name() == "Default" && r.namespace_uri() == NS_CONTENT_TYPES) {
                     string ext, ct;
 
-                    r.attributes_loop([&](const string& name, const string& value) {
-                        if (name == "Extension")
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "Extension" && ns.empty())
                             ext = value;
-                        else if (name == "ContentType")
+                        else if (name == "ContentType" && ns.empty())
                             ct = value;
 
                         return true;
                     });
 
                     defs[ext] = ct;
-                } else if (r.name() == "Override") {
+                } else if (r.local_name() == "Override" && r.namespace_uri() == NS_CONTENT_TYPES) {
                     string part, ct;
 
-                    r.attributes_loop([&](const string& name, const string& value) {
-                        if (name == "PartName")
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "PartName" && ns.empty())
                             part = value;
-                        else if (name == "ContentType")
+                        else if (name == "ContentType" && ns.empty())
                             ct = value;
 
                         return true;
@@ -880,7 +873,125 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
     }
 }
 
-workbook_pimpl::workbook_pimpl(const std::filesystem::path& fn) {
+static const pair<const string, file>& find_workbook(const unordered_map<string, file>& files) {
+    for (const auto& f : files) {
+        if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+            return f;
+    }
+
+    throw runtime_error("Could not find workbook XML file.");
+}
+
+static unordered_map<string, string> read_relationships(const string& fn, const unordered_map<string, file>& files) {
+    filesystem::path p = fn;
+    unordered_map<string, string> rels;
+
+    p.remove_filename();
+    p /= "_rels";
+    p /= filesystem::path(fn).filename().u8string() + ".rels";
+
+    if (files.count(p.u8string()) == 0)
+        throw runtime_error("File " + p.u8string() + " not found.");
+
+    xml_reader r(files.at(p.u8string()).data);
+    unsigned int depth = 0;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                if (r.local_name() != "Relationships" || r.namespace_uri() != NS_PACKAGE_RELATIONSHIPS)
+                    throw runtime_error("Root tag name was not \"Relationships\".");
+            } else if (depth == 1) {
+                if (r.local_name() == "Relationship" && r.namespace_uri() == NS_PACKAGE_RELATIONSHIPS) {
+                    string id, target;
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "Id" && ns.empty())
+                            id = value;
+                        else if (name == "Target" && ns.empty())
+                            target = value;
+
+                        return true;
+                    });
+
+                    if (!id.empty() && !target.empty())
+                        rels[id] = target;
+                }
+            }
+        }
+
+        depth = next_depth;
+    }
+
+    return rels;
+}
+
+static void parse_workbook(const string& fn, const string_view& data, const unordered_map<string, file>& files) {
+    xml_reader r(data);
+    unsigned int depth = 0;
+    unordered_map<string, string> sheets_rels, sheets;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                if (r.local_name() != "workbook" || r.namespace_uri() != NS_SPREADSHEET)
+                    throw runtime_error("Root tag name was not \"workbook\".");
+            } else if (depth == 2) {
+                if (r.local_name() == "sheet" && r.namespace_uri() == NS_SPREADSHEET) {
+                    string sheet_name, rid;
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+
+                        if (name == "name" && ns.empty())
+                            sheet_name = value;
+                        else if (name == "id" && ns == NS_RELATIONSHIPS)
+                            rid = value;
+
+                        return true;
+                    });
+
+                    if (!sheet_name.empty() && !rid.empty())
+                        sheets_rels[rid] = sheet_name;
+                }
+            }
+        }
+
+        depth = next_depth;
+    }
+
+    auto rels = read_relationships(fn, files);
+
+    for (const auto& sr : sheets_rels) {
+        for (const auto& r : rels) {
+            if (r.first == sr.first) {
+                sheets[sr.second] = r.second;
+                break;
+            }
+        }
+    }
+
+    // FIXME - load sheets
+}
+
+workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
 
@@ -899,10 +1010,13 @@ workbook_pimpl::workbook_pimpl(const std::filesystem::path& fn) {
                 filesystem::path name = archive_entry_pathname_utf8(entry);
                 auto ext = name.extension().u8string();
 
-                if (ext.length() != 4 || ext[0] != '.' || (ext[1] != 'X' && ext[1] != 'x') ||
-                    (ext[2] != 'M' && ext[2] != 'm') || (ext[3] != 'L' && ext[3] != 'l')) {
-                    continue;
+                for (auto& c : ext) {
+                    if (c >= 'A' && c <= 'Z')
+                        c = c - 'A' + 'a';
                 }
+
+                if (ext != ".xml" && ext != ".rels")
+                    continue;
 
                 string buf;
                 string tmp(BLOCK_SIZE, 0);
@@ -924,6 +1038,10 @@ workbook_pimpl::workbook_pimpl(const std::filesystem::path& fn) {
             throw runtime_error("[Content_Types].xml not found.");
 
         parse_content_types(files.at("[Content_Types].xml").data, files);
+
+        auto& wb = find_workbook(files);
+
+        parse_workbook(wb.first, wb.second.data, files);
 
         // FIXME
     } catch (...) {

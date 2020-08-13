@@ -170,9 +170,11 @@ public:
     int node_type() const;
     std::string name() const;
     bool has_attributes() const;
-    bool get_attribute(unsigned int i, std::string& name, std::string& value);
+    bool get_attribute(unsigned int i, std::string& name, std::string& ns, std::string& value);
     bool is_empty() const;
-    void attributes_loop(const std::function<bool(const std::string&, const std::string&)>& func);
+    void attributes_loop(const std::function<bool(const std::string&, const std::string&, const std::string&)>& func);
+    std::string namespace_uri() const;
+    std::string local_name() const;
 
 private:
     xmlParserInputBufferPtr buf;

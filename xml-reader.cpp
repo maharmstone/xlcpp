@@ -42,17 +42,26 @@ bool xml_reader::has_attributes() const {
     return xmlTextReaderHasAttributes(reader) != 0;
 }
 
-bool xml_reader::get_attribute(unsigned int i, string& name, string& value) {
+bool xml_reader::get_attribute(unsigned int i, string& name, string& ns, string& value) {
     if (!xmlTextReaderMoveToAttributeNo(reader, i))
         return false;
 
     {
-        auto xc = xmlTextReaderConstName(reader);
+        auto xc = xmlTextReaderConstLocalName(reader);
 
         if (!xc)
             name = "";
         else
             name = (char*)xc;
+    }
+
+    {
+        auto xc = xmlTextReaderConstNamespaceUri(reader);
+
+        if (!xc)
+            ns = "";
+        else
+            ns = (char*)xc;
     }
 
     {
@@ -71,17 +80,35 @@ bool xml_reader::is_empty() const {
     return xmlTextReaderIsEmptyElement(reader);
 }
 
-void xml_reader::attributes_loop(const function<bool(const string&, const string&)>& func) {
-    string name, value;
+void xml_reader::attributes_loop(const function<bool(const string&, const string&, const string&)>& func) {
+    string name, ns, value;
     unsigned int i = 0;
 
     while (true) {
-        if (!get_attribute(i, name, value))
+        if (!get_attribute(i, name, ns, value))
             return;
 
-        if (!func(name, value))
+        if (!func(name, ns, value))
             return;
 
         i++;
     }
+}
+
+string xml_reader::namespace_uri() const {
+    auto xc = xmlTextReaderConstNamespaceUri(reader);
+
+    if (!xc)
+        return "";
+
+    return (char*)xc;
+}
+
+string xml_reader::local_name() const {
+    auto xc = xmlTextReaderConstLocalName(reader);
+
+    if (!xc)
+        return "";
+
+    return (char*)xc;
 }
