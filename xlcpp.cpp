@@ -1050,7 +1050,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                 // FIXME - inlineStr, inline string
                 // FIXME - str, string
 
-                if (t_val == "n") // number
+                if (t_val == "n" || t_val.empty()) // number
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
                 else if (t_val == "b") // boolean
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
