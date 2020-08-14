@@ -1315,4 +1315,8 @@ const std::list<row>& sheet::rows() const {
     return impl->rows;
 }
 
+const std::list<cell>& row::cells() const {
+    return impl->cells;
+}
+
 }

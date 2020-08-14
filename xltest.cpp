@@ -47,7 +47,10 @@ static void read_test(const filesystem::path& fn) {
         for (const auto& r : sh.rows()) {
             cout << "Row " << row_num << endl;
 
-            // FIXME - cells
+            for (const auto& c : r.cells()) {
+                cout << "Cell" << endl;
+                // FIXME - cells
+            }
 
             row_num++;
         }

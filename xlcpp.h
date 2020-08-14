@@ -141,6 +141,8 @@ public:
     template<typename T>
     cell& add_cell(T* val) = delete;
 
+    const std::list<cell>& cells() const;
+
     row_pimpl* impl;
 };
 
