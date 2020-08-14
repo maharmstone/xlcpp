@@ -39,7 +39,12 @@ static void main2() {
 static void read_test(const filesystem::path& fn) {
     xlcpp::workbook wb(fn);
 
-    // FIXME
+    for (const auto& sh : wb.sheets()) {
+        cout << "Sheet: " << sh.name() << endl;
+
+        // FIXME - rows
+        // FIXME - cells
+    }
 }
 
 int main() {

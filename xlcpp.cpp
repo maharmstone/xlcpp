@@ -1303,4 +1303,12 @@ cell& row::add_cell(bool val) {
     return impl->add_cell(val);
 }
 
+const list<sheet>& workbook::sheets() const {
+    return impl->sheets;
+}
+
+std::string sheet::name() const {
+    return impl->name;
+}
+
 }

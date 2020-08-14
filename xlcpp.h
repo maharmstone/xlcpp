@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <chrono>
 #include <string>
+#include <list>
 
 #ifdef _WIN32
 
@@ -39,6 +40,7 @@ public:
     sheet& add_sheet(const std::string& name);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
+    const std::list<sheet>& sheets() const;
 
     workbook_pimpl* impl;
 };
@@ -51,6 +53,7 @@ public:
     sheet(workbook_pimpl& wb, const std::string& name, unsigned int num);
     ~sheet();
     row& add_row();
+    std::string name() const;
 
     sheet_pimpl* impl;
 };
