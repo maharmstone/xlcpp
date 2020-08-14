@@ -1040,6 +1040,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                         last_col++;
                     }
+
+                    last_col = col_num + 1;
                 } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                     in_v = true;
             }
