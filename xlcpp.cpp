@@ -125,6 +125,8 @@ string sheet_pimpl::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<bool>(c.impl->val)));
                 writer.end_element();
+            } else if (holds_alternative<nullptr_t>(c.impl->val)) {
+                // nop
             } else
                 throw runtime_error("Unknown type for cell.");
 
@@ -724,6 +726,10 @@ cell::cell(row_pimpl& r, unsigned int num, bool val) {
     impl = new cell_pimpl(r, num, val);
 }
 
+cell::cell(row_pimpl& r, unsigned int num, nullptr_t) {
+    impl = new cell_pimpl(r, num, nullptr);
+}
+
 unsigned int date::to_number() const {
     int m2 = ((int)month - 14) / 12;
     long long n;
@@ -1031,7 +1037,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                         throw runtime_error("Cells out of order.");
 
                     while (last_col < col_num) {
-                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, "");
+                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                         last_col++;
                     }
                 } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
@@ -1303,6 +1309,10 @@ cell& row::add_cell(bool val) {
     return impl->add_cell(val);
 }
 
+cell& row::add_cell(nullptr_t) {
+    return impl->add_cell(nullptr);
+}
+
 const list<sheet>& workbook::sheets() const {
     return impl->sheets;
 }
@@ -1331,7 +1341,9 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << get<double>(c.impl->val);
     else if (holds_alternative<bool>(c.impl->val))
         os << (get<bool>(c.impl->val) ? "true" : "false");
-    else
+    else if (holds_alternative<nullptr_t>(c.impl->val)) {
+        // nop
+    } else
         os << "?";
 
     return os;

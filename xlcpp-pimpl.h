@@ -151,7 +151,7 @@ public:
     const style* sty;
 
     unsigned int num;
-    std::variant<int64_t, shared_string, double, date, time, datetime, bool> val;
+    std::variant<int64_t, shared_string, double, date, time, datetime, bool, nullptr_t> val;
 };
 
 };
