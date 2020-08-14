@@ -89,6 +89,8 @@ public:
     void load_sheet(const std::string& name, const std::string& data);
     void load_shared_strings2(const std::string_view& sv);
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
+    void load_styles(const std::unordered_map<std::string, file>& files);
+    void load_styles2(const std::string_view& sv);
 
     template<class... Args>
     const style* find_style(Args&&... args) {
@@ -104,6 +106,7 @@ public:
     std::unordered_map<std::string, shared_string> shared_strings;
     std::vector<std::string> shared_strings2;
     std::unordered_set<style, style_hash> styles;
+    std::unordered_map<unsigned int, std::string> number_formats;
 
     mutable std::string buf;
 };

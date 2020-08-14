@@ -3,6 +3,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <vector>
+#include <array>
 
 #define BLOCK_SIZE 20480
 
@@ -14,6 +15,37 @@ static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.or
 static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
 
 #define NUMFMT_OFFSET 165
+
+static const array builtin_styles = {
+    pair{ 0, "General" },
+    pair{ 1, "0" },
+    pair{ 2, "0.00" },
+    pair{ 3, "#,##0" },
+    pair{ 4, "#,##0.00" },
+    pair{ 9, "0%" },
+    pair{ 10, "0.00%" },
+    pair{ 11, "0.00E+00" },
+    pair{ 12, "# ?/?" },
+    pair{ 13, "# ??/??" },
+    pair{ 14, "mm-dd-yy" },
+    pair{ 15, "d-mmm-yy" },
+    pair{ 16, "d-mmm" },
+    pair{ 17, "mmm-yy" },
+    pair{ 18, "h:mm AM/PM" },
+    pair{ 19, "h:mm:ss AM/PM" },
+    pair{ 20, "h:mm" },
+    pair{ 21, "h:mm:ss" },
+    pair{ 22, "m/d/yy h:mm" },
+    pair{ 37, "#,##0 ;(#,##0)" },
+    pair{ 38, "#,##0 ;[Red](#,##0)" },
+    pair{ 39, "#,##0.00;(#,##0.00)" },
+    pair{ 40, "#,##0.00;[Red](#,##0.00)" },
+    pair{ 45, "mm:ss" },
+    pair{ 46, "[h]:mm:ss" },
+    pair{ 47, "mmss.0" },
+    pair{ 48, "##0.0E+0" },
+    pair{ 49, "@" },
+};
 
 namespace xlcpp {
 
@@ -1180,6 +1212,66 @@ void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& file
     }
 }
 
+void workbook_pimpl::load_styles2(const string_view& sv) {
+    xml_reader r(sv);
+    unsigned int depth = 0;
+    bool in_numfmts = false;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                if (r.local_name() != "styleSheet" || r.namespace_uri() != NS_SPREADSHEET)
+                    throw runtime_error("Root tag name was not \"styleSheet\".");
+            } else if (depth == 1) {
+                // FIXME - cellXfs
+
+                if (r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                    in_numfmts = true;
+            } else if (depth == 2) {
+                if (in_numfmts && r.local_name() == "numFmt" && r.namespace_uri() == NS_SPREADSHEET) {
+                    unsigned int id = 0;
+                    string format_code;
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "numFmtId" && ns.empty())
+                            id = stoi(value);
+                        else if (name == "formatCode" && ns.empty())
+                            format_code = value;
+
+                        return true;
+                    });
+
+                    if (id != 0)
+                        number_formats[id] = format_code;
+                }
+            }
+        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
+            if (in_numfmts && r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET)
+                in_numfmts = false;
+        }
+
+        depth = next_depth;
+    }
+}
+
+void workbook_pimpl::load_styles(const unordered_map<string, file>& files) {
+    for (const auto& f : files) {
+        if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml") {
+            load_styles2(f.second.data);
+            return;
+        }
+    }
+}
+
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
@@ -1229,6 +1321,8 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         parse_content_types(files.at("[Content_Types].xml").data, files);
 
         load_shared_strings(files);
+
+        load_styles(files);
 
         auto& wb = find_workbook(files);
 

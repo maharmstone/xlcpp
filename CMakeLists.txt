@@ -27,7 +27,7 @@ target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
 
 target_compile_options(xlcpp PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-        -Wall>
+        -Wall -Wno-trigraphs>
     $<$<CXX_COMPILER_ID:MSVC>:
         /W4>)
 
