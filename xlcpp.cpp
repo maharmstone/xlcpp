@@ -1311,4 +1311,8 @@ std::string sheet::name() const {
     return impl->name;
 }
 
+const std::list<row>& sheet::rows() const {
+    return impl->rows;
+}
+
 }

@@ -54,6 +54,7 @@ public:
     ~sheet();
     row& add_row();
     std::string name() const;
+    const std::list<row>& rows() const;
 
     sheet_pimpl* impl;
 };

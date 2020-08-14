@@ -40,10 +40,17 @@ static void read_test(const filesystem::path& fn) {
     xlcpp::workbook wb(fn);
 
     for (const auto& sh : wb.sheets()) {
+        unsigned int row_num = 0;
+
         cout << "Sheet: " << sh.name() << endl;
 
-        // FIXME - rows
-        // FIXME - cells
+        for (const auto& r : sh.rows()) {
+            cout << "Row " << row_num << endl;
+
+            // FIXME - cells
+
+            row_num++;
+        }
     }
 }
 
