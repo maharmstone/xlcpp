@@ -1215,7 +1215,7 @@ void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& file
 void workbook_pimpl::load_styles2(const string_view& sv) {
     xml_reader r(sv);
     unsigned int depth = 0;
-    bool in_numfmts = false;
+    bool in_numfmts = false, in_cellxfs = false;
 
     while (r.read()) {
         unsigned int next_depth;
@@ -1232,10 +1232,10 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                 if (r.local_name() != "styleSheet" || r.namespace_uri() != NS_SPREADSHEET)
                     throw runtime_error("Root tag name was not \"styleSheet\".");
             } else if (depth == 1) {
-                // FIXME - cellXfs
-
                 if (r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                     in_numfmts = true;
+                else if (r.local_name() == "cellXfs" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                    in_cellxfs = true;
             } else if (depth == 2) {
                 if (in_numfmts && r.local_name() == "numFmt" && r.namespace_uri() == NS_SPREADSHEET) {
                     unsigned int id = 0;
@@ -1252,11 +1252,30 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
 
                     if (id != 0)
                         number_formats[id] = format_code;
+                } else if (in_cellxfs && r.local_name() == "xf" && r.namespace_uri() == NS_SPREADSHEET) {
+                    optional<unsigned int> numfmtid;
+                    bool apply_number_format = false;
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "numFmtId" && ns.empty())
+                            numfmtid = stoi(value);
+                        else if (name == "apply_number_format" && ns.empty())
+                            apply_number_format = value == "true" || value == "1";
+
+                        return true;
+                    });
+
+                    if (!apply_number_format)
+                        numfmtid = nullopt;
+
+                    cell_styles.push_back(numfmtid);
                 }
             }
         } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
             if (in_numfmts && r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET)
                 in_numfmts = false;
+            else if (in_cellxfs && r.local_name() == "cellXfs" && r.namespace_uri() == NS_SPREADSHEET)
+                in_cellxfs = false;
         }
 
         depth = next_depth;

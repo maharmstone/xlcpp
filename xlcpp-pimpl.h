@@ -107,6 +107,7 @@ public:
     std::vector<std::string> shared_strings2;
     std::unordered_set<style, style_hash> styles;
     std::unordered_map<unsigned int, std::string> number_formats;
+    std::vector<std::optional<unsigned int>> cell_styles;
 
     mutable std::string buf;
 };
