@@ -112,3 +112,12 @@ string xml_reader::local_name() const {
 
     return (char*)xc;
 }
+
+string xml_reader::value() const {
+    auto xc = xmlTextReaderConstValue(reader);
+
+    if (!xc)
+        return "";
+
+    return (char*)xc;
+}

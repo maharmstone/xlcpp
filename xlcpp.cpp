@@ -954,6 +954,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
     bool in_sheet_data = false;
     unsigned int last_index = 0, last_col;
     row* row = nullptr;
+    string r_val, s_val, t_val, v_val;
+    bool in_v = false;
 
     while (r.read()) {
         unsigned int next_depth;
@@ -1002,8 +1004,9 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                     last_index = row_index;
                     last_col = 0;
                 } else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
-                    string r_val, s_val, t_val;
                     unsigned int row_num, col_num;
+
+                    r_val = t_val = s_val = v_val = "";
 
                     // FIXME - t (type)
                     // FIXME - s (need to use this to identify dates and times etc.)
@@ -1036,16 +1039,31 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, "");
                         last_col++;
                     }
-
-                    // FIXME - set cell value
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, "");
-                }
+                } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                    in_v = true;
             }
         } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
             if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET)
                 in_sheet_data = false;
             else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
                 row = nullptr;
+            else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+                // FIXME - b, boolean
+                // FIXME - d, date
+                // FIXME - e, error
+                // FIXME - inlineStr, inline string
+                // FIXME - s, shared string
+                // FIXME - str, string
+
+                if (t_val == "n") // number
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                else
+                    throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
+            } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
+                in_v = false;
+        } else if (r.node_type() == XML_READER_TYPE_TEXT) {
+            if (in_v)
+                v_val += r.value();
         }
 
         depth = next_depth;

@@ -183,6 +183,7 @@ public:
     void attributes_loop(const std::function<bool(const std::string&, const std::string&, const std::string&)>& func);
     std::string namespace_uri() const;
     std::string local_name() const;
+    std::string value() const;
 
 private:
     xmlParserInputBufferPtr buf;
