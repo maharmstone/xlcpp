@@ -521,20 +521,6 @@ void workbook_pimpl::write_styles(struct archive* a) const {
             sty[s.num] = &s;
         }
 
-        writer.start_element("cellStyleXfs");
-        writer.attribute("count", to_string(styles.size()));
-
-        for (const auto& s : sty) {
-            writer.start_element("xf");
-            writer.attribute("numFmtId", to_string(number_formats[s->number_format] + NUMFMT_OFFSET));
-            writer.attribute("fontId", to_string(fonts[s->font]));
-            writer.attribute("fillId", "0");
-            writer.attribute("borderId", "0");
-            writer.end_element();
-        }
-
-        writer.end_element();
-
         {
             unsigned int style_id = 0;
 
@@ -547,8 +533,8 @@ void workbook_pimpl::write_styles(struct archive* a) const {
                 writer.attribute("fontId", to_string(fonts[s->font]));
                 writer.attribute("fillId", "0");
                 writer.attribute("borderId", "0");
-                writer.attribute("applyFont", "1"); // FIXME - "0" if not specified explicitly?
-                writer.attribute("xfId", to_string(style_id));
+                writer.attribute("applyFont", "true");
+                writer.attribute("applyNumberFormat", "true");
                 writer.end_element();
 
                 style_id++;
