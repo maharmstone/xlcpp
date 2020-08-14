@@ -1319,4 +1319,22 @@ const std::list<cell>& row::cells() const {
     return impl->cells;
 }
 
+std::ostream& operator<<(std::ostream& os, const cell& c) {
+    // FIXME - shared_string
+    // FIXME - date
+    // FIXME - time
+    // FIXME - datetime
+
+    if (holds_alternative<int64_t>(c.impl->val))
+        os << get<int64_t>(c.impl->val);
+    else if (holds_alternative<double>(c.impl->val))
+        os << get<double>(c.impl->val);
+    else if (holds_alternative<bool>(c.impl->val))
+        os << (get<bool>(c.impl->val) ? "true" : "false");
+    else
+        os << "?";
+
+    return os;
+}
+
 }

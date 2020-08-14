@@ -112,6 +112,8 @@ public:
     cell_pimpl* impl;
 };
 
+XLCPP std::ostream& operator<<(std::ostream& os, const cell& c);
+
 class XLCPP row {
 public:
     row(sheet_pimpl& s, unsigned int num);
