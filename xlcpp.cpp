@@ -13,6 +13,8 @@ static const string NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/office
 static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
 static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
 
+#define NUMFMT_OFFSET 165
+
 namespace xlcpp {
 
 sheet& workbook_pimpl::add_sheet(const string& name) {
@@ -451,7 +453,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         for (unsigned int i = 0; i < number_formats.size(); i++) {
             writer.start_element("numFmt");
-            writer.attribute("numFmtId", to_string(i));
+            writer.attribute("numFmtId", to_string(i + NUMFMT_OFFSET));
             writer.attribute("formatCode", *number_formats2[i]);
             writer.end_element();
         }
@@ -524,7 +526,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         for (const auto& s : sty) {
             writer.start_element("xf");
-            writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
+            writer.attribute("numFmtId", to_string(number_formats[s->number_format] + NUMFMT_OFFSET));
             writer.attribute("fontId", to_string(fonts[s->font]));
             writer.attribute("fillId", "0");
             writer.attribute("borderId", "0");
@@ -541,7 +543,7 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
             for (const auto& s : sty) {
                 writer.start_element("xf");
-                writer.attribute("numFmtId", to_string(number_formats[s->number_format]));
+                writer.attribute("numFmtId", to_string(number_formats[s->number_format] + NUMFMT_OFFSET));
                 writer.attribute("fontId", to_string(fonts[s->font]));
                 writer.attribute("fillId", "0");
                 writer.attribute("borderId", "0");
