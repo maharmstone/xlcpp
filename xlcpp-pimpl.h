@@ -91,6 +91,7 @@ public:
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
     void load_styles(const std::unordered_map<std::string, file>& files);
     void load_styles2(const std::string_view& sv);
+    std::string find_number_format(unsigned int num);
 
     template<class... Args>
     const style* find_style(Args&&... args) {
@@ -156,6 +157,7 @@ public:
 
     unsigned int num;
     std::variant<int64_t, shared_string, double, date, time, datetime, bool, nullptr_t> val;
+    std::string number_format;
 };
 
 };

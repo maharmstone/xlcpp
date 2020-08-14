@@ -48,7 +48,7 @@ static void read_test(const filesystem::path& fn) {
             cout << "Row " << row_num << endl;
 
             for (const auto& c : r.cells()) {
-                cout << "Cell: " << c << endl;
+                cout << "Cell: " << c << " (" << c.get_number_format() << ")" << endl;
             }
 
             row_num++;

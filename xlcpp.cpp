@@ -972,6 +972,28 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
     return rels;
 }
 
+string workbook_pimpl::find_number_format(unsigned int num) {
+    if (num >= cell_styles.size())
+        return "";
+
+    if (!cell_styles[num].has_value())
+        return "";
+
+    unsigned int numfmtid = cell_styles[num].value();
+
+    for (const auto& nf : number_formats) {
+        if (nf.first == numfmtid)
+            return nf.second;
+    }
+
+    for (const auto& bs : builtin_styles) {
+        if ((unsigned int)bs.first == numfmtid)
+            return bs.second;
+    }
+
+    return "";
+}
+
 void workbook_pimpl::load_sheet(const string& name, const string& data) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
 
@@ -1071,6 +1093,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
             else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
                 row = nullptr;
             else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+                cell* c;
+
                 // FIXME - identify dates
 
                 // FIXME - d, date
@@ -1079,13 +1103,16 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                 // FIXME - str, string
 
                 if (t_val == "n" || t_val.empty()) // number
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
                 else if (t_val == "b") // boolean
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
                 else if (t_val == "s") // shared string
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, shared_strings2.at(stoi(v_val)));
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, shared_strings2.at(stoi(v_val)));
                 else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
+
+                if (!s_val.empty())
+                    c->impl->number_format = find_number_format(stoi(s_val));
             } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
                 in_v = false;
         } else if (r.node_type() == XML_READER_TYPE_TEXT) {
@@ -1259,7 +1286,7 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "numFmtId" && ns.empty())
                             numfmtid = stoi(value);
-                        else if (name == "apply_number_format" && ns.empty())
+                        else if (name == "applyNumberFormat" && ns.empty())
                             apply_number_format = value == "true" || value == "1";
 
                         return true;
@@ -1451,6 +1478,10 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << "?";
 
     return os;
+}
+
+std::string cell::get_number_format() const {
+    return impl->number_format;
 }
 
 }
