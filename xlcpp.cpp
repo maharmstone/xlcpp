@@ -1008,11 +1008,6 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
 
                     r_val = t_val = s_val = v_val = "";
 
-                    // FIXME - t (type)
-                    // FIXME - s (need to use this to identify dates and times etc.)
-                    // FIXME - get v / is
-                    // FIXME - resolve shared strings
-
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "r" && ns.empty())
                             r_val = value;
@@ -1048,16 +1043,19 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
             else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
                 row = nullptr;
             else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+                // FIXME - identify dates
+
                 // FIXME - d, date
                 // FIXME - e, error
                 // FIXME - inlineStr, inline string
-                // FIXME - s, shared string
                 // FIXME - str, string
 
                 if (t_val == "n") // number
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
                 else if (t_val == "b") // boolean
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
+                else if (t_val == "s") // shared string
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, shared_strings2.at(stoi(v_val)));
                 else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
             } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
@@ -1137,6 +1135,55 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
     }
 }
 
+void workbook_pimpl::load_shared_strings2(const string_view& sv) {
+    xml_reader r(sv);
+    unsigned int depth = 0;
+    bool in_si = false;
+    string si_val;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+            if (depth == 0) {
+                if (r.local_name() != "sst" || r.namespace_uri() != NS_SPREADSHEET)
+                    throw runtime_error("Root tag name was not \"sst\".");
+            } else if (depth == 1) {
+                if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
+                    in_si = true;
+                    si_val = "";
+                }
+            }
+        } else if (r.node_type() == XML_READER_TYPE_TEXT) {
+            if (in_si)
+                si_val += r.value();
+        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
+            if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
+                shared_strings2.emplace_back(si_val);
+                in_si = false;
+            }
+        }
+
+        depth = next_depth;
+    }
+}
+
+void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& files) {
+    for (const auto& f : files) {
+        if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml") {
+            load_shared_strings2(f.second.data);
+            return;
+        }
+    }
+}
+
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
@@ -1184,6 +1231,8 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
             throw runtime_error("[Content_Types].xml not found.");
 
         parse_content_types(files.at("[Content_Types].xml").data, files);
+
+        load_shared_strings(files);
 
         auto& wb = find_workbook(files);
 
