@@ -41,6 +41,22 @@ static string make_reference(unsigned int row, unsigned int col) {
     return string(colstr) + to_string(row);
 }
 
+static void resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) {
+    if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
+        col = sv[0] - 'A';
+        row = stoi(string(sv.data() + 1, sv.length() - 1)) - 1;
+        return;
+    } else if (sv.length() >= 3 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= '0' && sv[2] <= '9') {
+        col = ((sv[0] - 'A' + 1) * 26) + sv[1] - 'A';
+        row = stoi(string(sv.data() + 2, sv.length() - 2)) - 1;
+        return;
+    }
+
+    // FIXME - support three-letter columns
+
+    throw runtime_error("Malformed reference \"" + string(sv) + "\".");
+}
+
 string sheet_pimpl::xml() const {
     xml_writer writer;
 
@@ -936,7 +952,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
     xml_reader r(data);
     unsigned int depth = 0;
     bool in_sheet_data = false;
-    unsigned int last_index = 0;
+    unsigned int last_index = 0, last_col;
     row* row = nullptr;
 
     while (r.read()) {
@@ -984,8 +1000,45 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                     row = &s.impl->rows.back();
 
                     last_index = row_index;
+                    last_col = 0;
                 } else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
-                    // FIXME - cell
+                    string r_val, s_val, t_val;
+                    unsigned int row_num, col_num;
+
+                    // FIXME - t (type)
+                    // FIXME - s (need to use this to identify dates and times etc.)
+                    // FIXME - get v / is
+                    // FIXME - resolve shared strings
+
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "r" && ns.empty())
+                            r_val = value;
+                        else if (name == "t" && ns.empty())
+                            t_val = value;
+                        else if (name == "s" && ns.empty())
+                            s_val = value;
+
+                        return true;
+                    });
+
+                    if (r_val.empty())
+                        throw runtime_error("Cell had no r value.");
+
+                    resolve_reference(r_val, row_num, col_num);
+
+                    if (row_num + 1 != last_index)
+                        throw runtime_error("Cell was in wrong row.");
+
+                    if (col_num < last_col)
+                        throw runtime_error("Cells out of order.");
+
+                    while (last_col < col_num) {
+                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, "");
+                        last_col++;
+                    }
+
+                    // FIXME - set cell value
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, "");
                 }
             }
         } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
