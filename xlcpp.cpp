@@ -1048,7 +1048,6 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
             else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
                 row = nullptr;
             else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
-                // FIXME - b, boolean
                 // FIXME - d, date
                 // FIXME - e, error
                 // FIXME - inlineStr, inline string
@@ -1057,6 +1056,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
 
                 if (t_val == "n") // number
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                else if (t_val == "b") // boolean
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
                 else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
             } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
