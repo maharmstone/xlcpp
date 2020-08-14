@@ -1332,7 +1332,6 @@ const std::list<cell>& row::cells() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const cell& c) {
-    // FIXME - shared_string
     // FIXME - date
     // FIXME - time
     // FIXME - datetime
@@ -1343,6 +1342,8 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << get<double>(c.impl->val);
     else if (holds_alternative<bool>(c.impl->val))
         os << (get<bool>(c.impl->val) ? "true" : "false");
+    else if (holds_alternative<shared_string>(c.impl->val))
+        os << c.impl->parent.parent.parent.shared_strings2[get<shared_string>(c.impl->val).num];
     else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
     } else
