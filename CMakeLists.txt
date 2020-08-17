@@ -14,6 +14,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 find_package(LibXml2 REQUIRED)
 find_package(LibArchive REQUIRED)
+find_package(fmt REQUIRED)
 
 add_definitions(-DXLCPP_EXPORT)
 
@@ -24,6 +25,7 @@ set(SRC_FILES xlcpp.cpp
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
+target_link_libraries(xlcpp fmt::fmt)
 
 target_compile_options(xlcpp PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:

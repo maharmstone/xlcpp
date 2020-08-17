@@ -2,6 +2,7 @@
 #include "xlcpp-pimpl.h"
 #include <archive.h>
 #include <archive_entry.h>
+#include <fmt/format.h>
 #include <vector>
 #include <array>
 
@@ -1460,7 +1461,6 @@ const std::list<cell>& row::cells() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const cell& c) {
-    // FIXME - date
     // FIXME - time
     // FIXME - datetime
 
@@ -1472,7 +1472,11 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << (get<bool>(c.impl->val) ? "true" : "false");
     else if (holds_alternative<shared_string>(c.impl->val))
         os << c.impl->parent.parent.parent.shared_strings2[get<shared_string>(c.impl->val).num];
-    else if (holds_alternative<nullptr_t>(c.impl->val)) {
+    else if (holds_alternative<date>(c.impl->val)) {
+        const auto& d = get<date>(c.impl->val);
+
+        os << fmt::format("{:04}-{:02}-{:02}", d.year, d.month, d.day);
+    } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
     } else
         os << "?";
