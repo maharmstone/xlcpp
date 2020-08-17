@@ -1063,6 +1063,34 @@ static bool is_date(const string_view& sv) {
     return false;
 }
 
+static bool is_time(const string_view& sv) {
+    if (sv == "General")
+        return false;
+
+    string s;
+
+    s.reserve(sv.length());
+
+    for (auto c : sv) {
+        if (c >= 'a' && c <= 'z')
+            s += c;
+        else if (c >= 'A' && c <= 'Z')
+            s += c - 'A' + 'a';
+    }
+
+    static const char* patterns[] = {
+        "hms",
+        "hmms",
+    };
+
+    for (const auto& p : patterns) {
+        if (s.find(p) != string::npos)
+            return true;
+    }
+
+    return false;
+}
+
 void workbook_pimpl::load_sheet(const string& name, const string& data) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
 
@@ -1174,14 +1202,22 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                     number_format = find_number_format(stoi(s_val));
 
                 if (t_val == "n" || t_val.empty()) { // number
-                    // FIXME - times and datetimes
+                    bool dt = is_date(number_format);
+                    bool tm = is_time(number_format);
 
-                    if (is_date(number_format)) {
+                    // FIXME - we can optimize is_date and is_time if one of the preset number formats
+
+                    if (dt) {
                         date d(1970, 1, 1);
 
                         d.from_number(stoi(v_val));
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                    } else if (tm) {
+                        auto n = (unsigned int)(stod(v_val) * 86400.0);
+                        time t(n / 3600, (n % 3600) / 60, n % 60);
+
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
                     } else
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
                 } else if (t_val == "b") // boolean
