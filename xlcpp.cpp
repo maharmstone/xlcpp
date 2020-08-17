@@ -823,6 +823,42 @@ date::date(time_t tt) {
     day = local_tm.tm_mday;
 }
 
+void date::from_number(unsigned int num) {
+    unsigned int J = num + 2416481;
+    unsigned int f, e, g, h;
+
+    f = J;
+    f *= 4;
+    f += 274277;
+    f /= 146097;
+    f *= 3;
+    f /= 4;
+    f += J;
+    f += 1363;
+
+    e = (f * 4) + 3;
+
+    g = e % 1461;
+    g /= 4;
+
+    h = (5 * g) + 2;
+
+    day = h % 153;
+    day /= 5;
+    day++;
+
+    month = h;
+    month /= 153;
+    month += 2;
+    month %= 12;
+    month++;
+
+    year = 14 - month;
+    year /= 12;
+    year -= 4716;
+    year += e / 1461;
+}
+
 time::time(time_t tt) {
     tm local_tm = *localtime(&tt);
 
@@ -995,6 +1031,38 @@ string workbook_pimpl::find_number_format(unsigned int num) {
     return "";
 }
 
+static bool is_date(const string_view& sv) {
+    if (sv == "General")
+        return false;
+
+    string s;
+
+    s.reserve(sv.length());
+
+    for (auto c : sv) {
+        if (c >= 'a' && c <= 'z')
+            s += c;
+        else if (c >= 'A' && c <= 'Z')
+            s += c - 'A' + 'a';
+    }
+
+    static const char* patterns[] = {
+        "dmy",
+        "dmmy",
+        "ymd",
+        "ymmd",
+        "mdy",
+        "mddy"
+    };
+
+    for (const auto& p : patterns) {
+        if (s.find(p) != string::npos)
+            return true;
+    }
+
+    return false;
+}
+
 void workbook_pimpl::load_sheet(const string& name, const string& data) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
 
@@ -1095,17 +1163,28 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                 row = nullptr;
             else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
                 cell* c;
-
-                // FIXME - identify dates
+                string number_format;
 
                 // FIXME - d, date
                 // FIXME - e, error
                 // FIXME - inlineStr, inline string
                 // FIXME - str, string
 
-                if (t_val == "n" || t_val.empty()) // number
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
-                else if (t_val == "b") // boolean
+                if (!s_val.empty())
+                    number_format = find_number_format(stoi(s_val));
+
+                if (t_val == "n" || t_val.empty()) { // number
+                    // FIXME - times and datetimes
+
+                    if (is_date(number_format)) {
+                        date d(1970, 1, 1);
+
+                        d.from_number(stoi(v_val));
+
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                    } else
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                } else if (t_val == "b") // boolean
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
                 else if (t_val == "s") // shared string
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, shared_strings2.at(stoi(v_val)));
@@ -1113,7 +1192,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
 
                 if (!s_val.empty())
-                    c->impl->number_format = find_number_format(stoi(s_val));
+                    c->impl->number_format = number_format;
             } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
                 in_v = false;
         } else if (r.node_type() == XML_READER_TYPE_TEXT) {

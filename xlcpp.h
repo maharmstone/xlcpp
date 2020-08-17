@@ -65,6 +65,7 @@ public:
     date(time_t tt);
 
     unsigned int to_number() const;
+    void from_number(unsigned int num);
 
     unsigned int year, month, day;
 };
