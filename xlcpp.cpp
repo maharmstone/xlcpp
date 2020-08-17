@@ -1207,7 +1207,15 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
 
                     // FIXME - we can optimize is_date and is_time if one of the preset number formats
 
-                    if (dt) {
+                    if (dt && tm) {
+                        auto d = stod(v_val);
+                        auto n = (unsigned int)((d - (int)d) * 86400.0);
+                        datetime dt(1970, 1, 1, n / 3600, (n % 3600) / 60, n % 60);
+
+                        dt.d.from_number((int)d);
+
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
+                    } else if (dt) {
                         date d(1970, 1, 1);
 
                         d.from_number(stoi(v_val));
