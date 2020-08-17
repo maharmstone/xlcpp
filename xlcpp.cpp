@@ -2,9 +2,11 @@
 #include "xlcpp-pimpl.h"
 #include <archive.h>
 #include <archive_entry.h>
-#include <fmt/format.h>
 #include <vector>
 #include <array>
+
+#define FMT_HEADER_ONLY
+#include <fmt/format.h>
 
 #define BLOCK_SIZE 20480
 

@@ -98,7 +98,7 @@ class cell_pimpl;
 
 class XLCPP cell {
 public:
-    cell(row_pimpl& r, unsigned int num, nullptr_t);
+    cell(row_pimpl& r, unsigned int num, std::nullptr_t);
     cell(row_pimpl& r, unsigned int num, int64_t val);
     cell(row_pimpl& r, unsigned int num, const std::string& val);
     cell(row_pimpl& r, unsigned int num, double val);
@@ -133,7 +133,7 @@ public:
     cell& add_cell(const datetime& val);
     cell& add_cell(const std::chrono::system_clock::time_point& val);
     cell& add_cell(bool val);
-    cell& add_cell(nullptr_t);
+    cell& add_cell(std::nullptr_t);
 
     cell& add_cell(const char* val) {
         return add_cell(std::string(val));
