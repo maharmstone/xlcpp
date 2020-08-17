@@ -1576,8 +1576,6 @@ const std::list<cell>& row::cells() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const cell& c) {
-    // FIXME - datetime
-
     if (holds_alternative<int64_t>(c.impl->val))
         os << get<int64_t>(c.impl->val);
     else if (holds_alternative<double>(c.impl->val))
@@ -1594,6 +1592,11 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         const auto& t = get<time>(c.impl->val);
 
         os << fmt::format("{:02}:{:02}:{:02}", t.hour, t.minute, t.second);
+    } else if (holds_alternative<datetime>(c.impl->val)) {
+        const auto& dt = get<datetime>(c.impl->val);
+
+        os << fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                          dt.d.year, dt.d.month, dt.d.day, dt.t.hour, dt.t.minute, dt.t.second);
     } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
     } else
