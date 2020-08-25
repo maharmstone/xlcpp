@@ -966,10 +966,17 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
     p /= "_rels";
     p /= filesystem::path(fn).filename().u8string() + ".rels";
 
-    if (files.count(p.u8string()) == 0)
-        throw runtime_error("File " + p.u8string() + " not found.");
+    auto ps = p.u8string();
 
-    xml_reader r(files.at(p.u8string()).data);
+    for (auto& c : ps) {
+        if (c == '\\')
+            c = '/';
+    }
+
+    if (files.count(ps) == 0)
+        throw runtime_error("File " + ps + " not found.");
+
+    xml_reader r(files.at(ps).data);
     unsigned int depth = 0;
 
     while (r.read()) {
@@ -1306,10 +1313,17 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
                 name.remove_filename();
                 name /= r.second;
 
-                if (files.count(name.u8string()) == 0)
-                    throw runtime_error("File " + name.u8string() + " not found.");
+                auto ns = name.u8string();
 
-                load_sheet(sr.second, files.at(name.u8string()).data);
+                for (auto& c : ns) {
+                    if (c == '\\')
+                        c = '/';
+                }
+
+                if (files.count(ns) == 0)
+                    throw runtime_error("File " + ns + " not found.");
+
+                load_sheet(sr.second, files.at(ns).data);
                 break;
             }
         }
