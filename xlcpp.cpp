@@ -1633,4 +1633,17 @@ std::string cell::get_number_format() const {
     return impl->number_format;
 }
 
+variant<int64_t, string, double, date, time, datetime, bool, nullptr_t> cell::value() const {
+    decltype(value()) v;
+
+    visit([&](auto&& arg) {
+        if constexpr (is_same_v<decay_t<decltype(arg)>, shared_string>)
+            v = impl->parent.parent.parent.shared_strings2[get<shared_string>(impl->val).num];
+        else
+            v = arg;
+    }, impl->val);
+
+    return v;
+}
+
 }

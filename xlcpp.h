@@ -4,6 +4,7 @@
 #include <chrono>
 #include <string>
 #include <list>
+#include <variant>
 
 #ifdef _WIN32
 
@@ -114,6 +115,7 @@ public:
     void set_number_format(const std::string& fmt);
     void set_font(const std::string& name, unsigned int size, bool bold = false);
     std::string get_number_format() const;
+    std::variant<int64_t, std::string, double, date, time, datetime, bool, std::nullptr_t> value() const;
 
     cell_pimpl* impl;
 };
