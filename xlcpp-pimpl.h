@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
+#include <optional>
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
