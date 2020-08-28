@@ -1197,6 +1197,9 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                     }
 
                     last_col = col_num + 1;
+
+                    if (r.is_empty())
+                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                 } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                     in_v = true;
             }
