@@ -110,6 +110,7 @@ public:
     std::unordered_set<style, style_hash> styles;
     std::unordered_map<unsigned int, std::string> number_formats;
     std::vector<std::optional<unsigned int>> cell_styles;
+    bool date1904 = false;
 
     mutable std::string buf;
 };

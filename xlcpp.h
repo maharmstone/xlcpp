@@ -65,8 +65,8 @@ public:
     date(unsigned int year, unsigned int month, unsigned int day) : year(year), month(month), day(day) { }
     date(time_t tt);
 
-    unsigned int to_number() const;
-    void from_number(unsigned int num);
+    unsigned int to_number(bool date1904 = false) const;
+    void from_number(unsigned int num, bool date1904 = false);
 
     unsigned int year, month, day;
 };
@@ -88,7 +88,7 @@ public:
     datetime(time_t tt) : d(tt), t(tt) { }
     datetime(const std::chrono::system_clock::time_point& tp) : datetime(std::chrono::system_clock::to_time_t(tp)) { }
 
-    double to_number() const;
+    double to_number(bool date1904 = false) const;
 
     date d;
     time t;

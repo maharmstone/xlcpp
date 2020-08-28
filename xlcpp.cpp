@@ -142,7 +142,7 @@ string sheet_pimpl::xml() const {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<date>(c.impl->val).to_number()));
+                writer.text(to_string(get<date>(c.impl->val).to_number(parent.date1904)));
                 writer.end_element();
             } else if (holds_alternative<time>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
@@ -154,7 +154,7 @@ string sheet_pimpl::xml() const {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<datetime>(c.impl->val).to_number()));
+                writer.text(to_string(get<datetime>(c.impl->val).to_number(parent.date1904)));
                 writer.end_element();
             } else if (holds_alternative<bool>(c.impl->val)) {
                 writer.attribute("t", "b"); // bool
@@ -209,7 +209,7 @@ void workbook_pimpl::write_workbook_xml(struct archive* a) const {
         writer.start_element("workbook", {{"", NS_SPREADSHEET}, {"r", NS_RELATIONSHIPS}});
 
         writer.start_element("workbookPr");
-        writer.attribute("date1904", "true");
+        writer.attribute("date1904", date1904 ? "true" : "false");
         writer.end_element();
 
         writer.start_element("sheets");
@@ -753,7 +753,7 @@ cell::cell(row_pimpl& r, unsigned int num, nullptr_t) {
     impl = new cell_pimpl(r, num, nullptr);
 }
 
-unsigned int date::to_number() const {
+unsigned int date::to_number(bool date1904) const {
     int m2 = ((int)month - 14) / 12;
     long long n;
 
@@ -761,7 +761,10 @@ unsigned int date::to_number() const {
     n += (367 * ((int)month - 2 - (12 * m2))) / 12;
     n -= (3 * (((int)year + 4900 + m2)/100)) / 4;
     n += day;
-    n -= 2448556;
+    n -= 2447094;
+
+    if (date1904)
+        n -= 1462;
 
     return n;
 }
@@ -781,8 +784,8 @@ double time::to_number() const {
     return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
 }
 
-double datetime::to_number() const {
-    return (double)d.to_number() + t.to_number();
+double datetime::to_number(bool date1904) const {
+    return (double)d.to_number(date1904) + t.to_number();
 }
 
 void style::set_font(const std::string& font_name, unsigned int font_size, bool bold) {
@@ -825,9 +828,12 @@ date::date(time_t tt) {
     day = local_tm.tm_mday;
 }
 
-void date::from_number(unsigned int num) {
-    unsigned int J = num + 2416481;
+void date::from_number(unsigned int num, bool date1904) {
+    unsigned int J = num + 2415019;
     unsigned int f, e, g, h;
+
+    if (date1904)
+        J += 1462;
 
     f = J;
     f *= 4;
@@ -871,6 +877,7 @@ time::time(time_t tt) {
 
 workbook::workbook() {
     impl = new workbook_pimpl;
+    impl->date1904 = true;
 }
 
 static void parse_content_types(const string& ct, unordered_map<string, file>& files) {
@@ -1221,13 +1228,13 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                         auto n = (unsigned int)((d - (int)d) * 86400.0);
                         datetime dt(1970, 1, 1, n / 3600, (n % 3600) / 60, n % 60);
 
-                        dt.d.from_number((int)d);
+                        dt.d.from_number((int)d, date1904);
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
                     } else if (dt) {
                         date d(1970, 1, 1);
 
-                        d.from_number(stoi(v_val));
+                        d.from_number(stoi(v_val), date1904);
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
                     } else if (tm) {
@@ -1276,12 +1283,20 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
             if (depth == 0) {
                 if (r.local_name() != "workbook" || r.namespace_uri() != NS_SPREADSHEET)
                     throw runtime_error("Root tag name was not \"workbook\".");
+            } else if (depth == 1) {
+                if (r.local_name() == "workbookPr" && r.namespace_uri() == NS_SPREADSHEET) {
+                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                        if (name == "date1904" && ns.empty())
+                            date1904 = value == "true" || value == "1";
+
+                        return true;
+                    });
+                }
             } else if (depth == 2) {
                 if (r.local_name() == "sheet" && r.namespace_uri() == NS_SPREADSHEET) {
                     string sheet_name, rid;
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
-
                         if (name == "name" && ns.empty())
                             sheet_name = value;
                         else if (name == "id" && ns == NS_RELATIONSHIPS)
