@@ -1421,7 +1421,7 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                         number_formats[id] = format_code;
                 } else if (in_cellxfs && r.local_name() == "xf" && r.namespace_uri() == NS_SPREADSHEET) {
                     optional<unsigned int> numfmtid;
-                    bool apply_number_format = false;
+                    bool apply_number_format = true;
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "numFmtId" && ns.empty())
