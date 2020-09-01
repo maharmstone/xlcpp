@@ -1245,8 +1245,21 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
                         time t(n / 3600, (n % 3600) / 60, n % 60);
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
-                    } else
-                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                    } else {
+                        bool is_int = true;
+
+                        for (const auto c : v_val) {
+                            if (c != '-' && (c < '0' || c > '9')) {
+                                is_int = false;
+                                break;
+                            }
+                        }
+
+                        if (is_int)
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)stoll(v_val));
+                        else
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
+                    }
                 } else if (t_val == "b") // boolean
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stoi(v_val) != 0);
                 else if (t_val == "s") {// shared string
