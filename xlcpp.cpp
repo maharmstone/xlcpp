@@ -52,12 +52,12 @@ static const array builtin_styles = {
 
 namespace xlcpp {
 
-sheet& workbook_pimpl::add_sheet(const string& name) {
-    return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
+sheet& workbook_pimpl::add_sheet(const string& name, bool visible) {
+    return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 }
 
-sheet& workbook::add_sheet(const string& name) {
-    return impl->add_sheet(name);
+sheet& workbook::add_sheet(const string& name, bool visible) {
+    return impl->add_sheet(name, visible);
 }
 
 static string make_reference(unsigned int row, unsigned int col) {
@@ -1107,8 +1107,8 @@ static bool is_time(const string_view& sv) {
     return false;
 }
 
-void workbook_pimpl::load_sheet(const string& name, const string& data) {
-    auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1);
+void workbook_pimpl::load_sheet(const string& name, const string& data, bool visible) {
+    auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
     xml_reader r(data);
     unsigned int depth = 0;
@@ -1292,7 +1292,17 @@ void workbook_pimpl::load_sheet(const string& name, const string& data) {
 void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, const unordered_map<string, file>& files) {
     xml_reader r(data);
     unsigned int depth = 0;
-    unordered_map<string, string> sheets_rels;
+
+    struct sheet_info {
+        sheet_info(const string_view& rid, const string_view& name, bool visible) :
+            rid(rid), name(name), visible(visible) { }
+
+        string rid;
+        string name;
+        bool visible;
+    };
+
+    vector<sheet_info> sheets_rels;
 
     while (r.read()) {
         unsigned int next_depth;
@@ -1320,18 +1330,21 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
             } else if (depth == 2) {
                 if (r.local_name() == "sheet" && r.namespace_uri() == NS_SPREADSHEET) {
                     string sheet_name, rid;
+                    bool visible = true;
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "name" && ns.empty())
                             sheet_name = value;
                         else if (name == "id" && ns == NS_RELATIONSHIPS)
                             rid = value;
+                        else if (name == "state" && ns.empty())
+                            visible = value != "hidden";
 
                         return true;
                     });
 
                     if (!sheet_name.empty() && !rid.empty())
-                        sheets_rels[rid] = sheet_name;
+                        sheets_rels.emplace_back(rid, sheet_name, visible);
                 }
             }
         }
@@ -1345,7 +1358,7 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
 
     for (const auto& sr : sheets_rels) {
         for (const auto& r : rels) {
-            if (r.first == sr.first) {
+            if (r.first == sr.rid) {
                 auto name = filesystem::path(fn);
 
                 // FIXME - can we resolve relative paths properly?
@@ -1363,7 +1376,7 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
                 if (files.count(ns) == 0)
                     throw runtime_error("File " + ns + " not found.");
 
-                load_sheet(sr.second, files.at(ns).data);
+                load_sheet(sr.name, files.at(ns).data, sr.visible);
                 break;
             }
         }
@@ -1571,8 +1584,8 @@ workbook::~workbook() {
     delete impl;
 }
 
-sheet::sheet(workbook_pimpl& wb, const std::string& name, unsigned int num) {
-    impl = new sheet_pimpl(wb, name, num);
+sheet::sheet(workbook_pimpl& wb, const std::string& name, unsigned int num, bool visible) {
+    impl = new sheet_pimpl(wb, name, num, visible);
 }
 
 sheet::~sheet() {
@@ -1629,6 +1642,10 @@ const list<sheet>& workbook::sheets() const {
 
 std::string sheet::name() const {
     return impl->name;
+}
+
+bool sheet::visible() const {
+    return impl->visible;
 }
 
 const std::list<row>& sheet::rows() const {

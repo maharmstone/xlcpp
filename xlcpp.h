@@ -38,7 +38,7 @@ public:
     workbook();
     workbook(const std::filesystem::path& fn);
     ~workbook();
-    sheet& add_sheet(const std::string& name);
+    sheet& add_sheet(const std::string& name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
     const std::list<sheet>& sheets() const;
@@ -51,10 +51,11 @@ class row;
 
 class XLCPP sheet {
 public:
-    sheet(workbook_pimpl& wb, const std::string& name, unsigned int num);
+    sheet(workbook_pimpl& wb, const std::string& name, unsigned int num, bool visible = true);
     ~sheet();
     row& add_row();
     std::string name() const;
+    bool visible() const;
     const std::list<row>& rows() const;
 
     sheet_pimpl* impl;
