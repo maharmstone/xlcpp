@@ -1056,19 +1056,19 @@ static bool is_date(const string_view& sv) {
     s.reserve(sv.length());
 
     for (auto c : sv) {
-        if (c >= 'a' && c <= 'z')
-            s += c;
-        else if (c >= 'A' && c <= 'Z')
-            s += c - 'A' + 'a';
+        if (c >= 'a' && c <= 'z') {
+            if (s.empty() || s.back() != c)
+                s += c;
+        } else if (c >= 'A' && c <= 'Z') {
+            if (s.empty() || s.back() != c - 'A' + 'a')
+                s += c - 'A' + 'a';
+        }
     }
 
     static const char* patterns[] = {
         "dmy",
-        "dmmy",
         "ymd",
-        "ymmd",
-        "mdy",
-        "mddy"
+        "mdy"
     };
 
     for (const auto& p : patterns) {
@@ -1088,23 +1088,16 @@ static bool is_time(const string_view& sv) {
     s.reserve(sv.length());
 
     for (auto c : sv) {
-        if (c >= 'a' && c <= 'z')
-            s += c;
-        else if (c >= 'A' && c <= 'Z')
-            s += c - 'A' + 'a';
+        if (c >= 'a' && c <= 'z') {
+            if (s.empty() || s.back() != c)
+                s += c;
+        } else if (c >= 'A' && c <= 'Z') {
+            if (s.empty() || s.back() != c - 'A' + 'a')
+                s += c - 'A' + 'a';
+        }
     }
 
-    static const char* patterns[] = {
-        "hms",
-        "hmms",
-    };
-
-    for (const auto& p : patterns) {
-        if (s.find(p) != string::npos)
-            return true;
-    }
-
-    return false;
+    return s.find("hms") != string::npos;
 }
 
 void workbook_pimpl::load_sheet(const string& name, const string& data, bool visible) {
