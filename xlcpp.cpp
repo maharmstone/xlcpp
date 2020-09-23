@@ -1228,10 +1228,20 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
                     } else if (dt) {
                         date d(1970, 1, 1);
+                        int num;
+                        bool valid_num = true;
 
-                        d.from_number(stoi(v_val), date1904);
+                        try {
+                            num = stoi(v_val);
+                        } catch (...) {
+                            valid_num = false;
+                        }
 
-                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                        if (valid_num) {
+                            d.from_number(num, date1904);
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                        } else
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     } else if (tm) {
                         auto n = (unsigned int)(stod(v_val) * 86400.0);
                         time t(n / 3600, (n % 3600) / 60, n % 60);
