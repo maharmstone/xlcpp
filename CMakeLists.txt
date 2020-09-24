@@ -69,3 +69,4 @@ configure_package_config_file(
 )
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/xlcppConfig.cmake" DESTINATION "lib/cmake/xlcpp")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libxlcpp.pdb" DESTINATION "${CMAKE_INSTALL_BINDIR}" OPTIONAL)
