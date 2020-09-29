@@ -1097,7 +1097,7 @@ static bool is_time(const string_view& sv) {
         }
     }
 
-    return s.find("hms") != string::npos;
+    return s.find("hm") != string::npos;
 }
 
 void workbook_pimpl::load_sheet(const string& name, const string& data, bool visible) {
