@@ -1244,6 +1244,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                             c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     } else if (tm) {
                         auto n = (unsigned int)(stod(v_val) * 86400.0);
+
+                        n %= 86400;
                         time t(n / 3600, (n % 3600) / 60, n % 60);
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
