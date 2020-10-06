@@ -1207,7 +1207,6 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                 // FIXME - d, date
                 // FIXME - inlineStr, inline string
-                // FIXME - str, string
 
                 if (!s_val.empty())
                     number_format = find_number_format(stoi(s_val));
@@ -1278,7 +1277,12 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     c->impl = new cell_pimpl(*row->impl, row->impl->cells.size(), ss);
                 } else if (t_val == "e") // error
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                else
+                else if (t_val == "str") { // string
+                    if (!v_val.empty())
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, v_val);
+                    else
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                } else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
 
                 if (!s_val.empty())
