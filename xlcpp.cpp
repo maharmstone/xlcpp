@@ -1535,8 +1535,8 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         unordered_map<string, file> files;
 
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname_utf8(entry)) {
-                filesystem::path name = archive_entry_pathname_utf8(entry);
+            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
+                filesystem::path name = archive_entry_pathname(entry);
                 auto ext = name.extension().u8string();
 
                 for (auto& c : ext) {
