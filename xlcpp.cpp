@@ -1278,10 +1278,12 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                 } else if (t_val == "e") // error
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                 else if (t_val == "str") { // string
-                    if (!v_val.empty())
-                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, v_val);
-                    else
-                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+
+                    if (!v_val.empty()) {
+                        // so we don't have to expose shared_string publicly
+                        c->impl->val = v_val;
+                    }
                 } else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
 
