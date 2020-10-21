@@ -1100,6 +1100,74 @@ static bool is_time(const string_view& sv) {
     return s.find("hm") != string::npos;
 }
 
+static bool __inline is_hex(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
+static uint8_t __inline from_hex(char c) {
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    else if (c >= 'a' && c <= 'f')
+        return c - 'a' + 0xa;
+    else if (c >= 'A' && c <= 'F')
+        return c - 'A' + 0xa;
+
+    return 0;
+}
+
+static string decode_escape_sequences(const string_view& sv) {
+    bool has_underscore = false;
+
+    if (sv.length() < 7)
+        return string(sv);
+
+    for (auto c : sv) {
+        if (c == '_') {
+            has_underscore = true;
+            break;
+        }
+    }
+
+    if (!has_underscore)
+        return string(sv);
+
+    string s;
+
+    s.reserve(sv.length());
+
+    for (unsigned int i = 0; i < sv.length(); i++) {
+        if (i + 6 < sv.length() && sv[i] == '_' && sv[i+1] == 'x' && is_hex(sv[i+2]) && is_hex(sv[i+3]) && is_hex(sv[i+4]) && is_hex(sv[i+5]) && sv[i+6] == '_') {
+            uint16_t val = (from_hex(sv[i+2]) << 12) | (from_hex(sv[i+3]) << 8) | (from_hex(sv[i+4]) << 4) | from_hex(sv[i+5]);
+
+            if (val < 0x80)
+                s += (char)val;
+            else if (val < 0x800) {
+                char buf[3];
+
+                buf[0] = 0xc0 | (val >> 6);
+                buf[1] = 0x80 | (val & 0x3f);
+                buf[2] = 0;
+
+                s += buf;
+            } else {
+                char buf[4];
+
+                buf[0] = 0xe0 | (val >> 12);
+                buf[1] = 0x80 | ((val & 0xfc0) >> 6);
+                buf[2] = 0x80 | (val & 0x3f);
+                buf[3] = 0;
+
+                s += buf;
+            }
+
+            i += 6;
+        } else
+            s += sv[i];
+    }
+
+    return s;
+}
+
 void workbook_pimpl::load_sheet(const string& name, const string& data, bool visible) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
@@ -1282,7 +1350,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                     if (!v_val.empty()) {
                         // so we don't have to expose shared_string publicly
-                        c->impl->val = v_val;
+                        c->impl->val = decode_escape_sequences(v_val);
                     }
                 } else
                     throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
@@ -1422,7 +1490,7 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
             }
         } else if (r.node_type() == XML_READER_TYPE_TEXT) {
             if (in_si)
-                si_val += r.value();
+                si_val += decode_escape_sequences(r.value());
         } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
             if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
                 shared_strings2.emplace_back(si_val);
