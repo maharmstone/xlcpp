@@ -769,6 +769,8 @@ unsigned int date::to_number(bool date1904) const {
 
     if (date1904)
         n -= 1462;
+    else if (n < 61) // Excel's 29/2/1900 bug
+        n--;
 
     return n;
 }
