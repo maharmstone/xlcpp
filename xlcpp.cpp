@@ -838,6 +838,8 @@ void date::from_number(unsigned int num, bool date1904) {
 
     if (date1904)
         J += 1462;
+    else if (num < 61) // Excel's 29/2/1900 bug
+        J++;
 
     f = J;
     f *= 4;
