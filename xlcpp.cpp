@@ -883,7 +883,7 @@ time::time(time_t tt) {
 
 workbook::workbook() {
     impl = new workbook_pimpl;
-    impl->date1904 = true;
+    impl->date1904 = false;
 }
 
 static void parse_content_types(const string& ct, unordered_map<string, file>& files) {
