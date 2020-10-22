@@ -42,6 +42,9 @@ public:
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
     const std::list<sheet>& sheets() const;
+#ifdef _WIN32
+    void rename(const std::filesystem::path& fn) const;
+#endif
 
     workbook_pimpl* impl;
 };

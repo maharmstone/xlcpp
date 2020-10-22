@@ -72,6 +72,9 @@ class workbook_pimpl {
 public:
     workbook_pimpl() = default;
     workbook_pimpl(const std::filesystem::path& fn);
+#ifdef _WIN32
+    ~workbook_pimpl();
+#endif
     sheet& add_sheet(const std::string& name, bool visible);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
@@ -94,6 +97,10 @@ public:
     void load_styles2(const std::string_view& sv);
     std::string find_number_format(unsigned int num);
 
+#ifdef _WIN32
+    void rename(const std::filesystem::path& fn) const;
+#endif
+
     template<class... Args>
     const style* find_style(Args&&... args) {
         auto ret = styles.emplace(args...);
@@ -113,6 +120,11 @@ public:
     bool date1904 = false;
 
     mutable std::string buf;
+
+#ifdef _WIN32
+    HANDLE h = INVALID_HANDLE_VALUE;
+    uint8_t readbuf[1048576];
+#endif
 };
 
 class sheet_pimpl {

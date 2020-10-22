@@ -33,6 +33,10 @@ target_compile_options(xlcpp PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:
         /W4>)
 
+if(WIN32)
+    add_definitions(-D_WIN32_WINNT=0x0600 -DNOMINMAX)
+endif()
+
 target_include_directories(xlcpp PUBLIC "${LibArchive_INCLUDE_DIR}")
 target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
 

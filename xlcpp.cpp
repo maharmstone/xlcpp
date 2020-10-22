@@ -5,6 +5,10 @@
 #include <vector>
 #include <array>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #define FMT_HEADER_ONLY
 #include <fmt/format.h>
 
@@ -1590,6 +1594,69 @@ void workbook_pimpl::load_styles(const unordered_map<string, file>& files) {
     }
 }
 
+#ifdef _WIN32
+__inline string utf16_to_utf8(const u16string_view& s) {
+    string ret;
+
+    if (s.empty())
+        return "";
+
+    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), (int)s.length(), nullptr, 0,
+                                   nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 1 failed.");
+
+    ret.resize(len);
+
+    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), (int)s.length(), ret.data(), len,
+                              nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 2 failed.");
+
+    return ret;
+}
+
+class last_error : public exception {
+public:
+    last_error(const string_view& function, int le) {
+        string nice_msg;
+
+        {
+            char16_t* fm;
+
+            if (FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+                le, 0, reinterpret_cast<LPWSTR>(&fm), 0, nullptr)) {
+                try {
+                    u16string_view s = fm;
+
+                    while (!s.empty() && (s[s.length() - 1] == u'\r' || s[s.length() - 1] == u'\n')) {
+                        s.remove_suffix(1);
+                    }
+
+                    nice_msg = utf16_to_utf8(s);
+                } catch (...) {
+                    LocalFree(fm);
+                    throw;
+                }
+
+                LocalFree(fm);
+            }
+        }
+
+        msg = string(function) + " failed (error " + to_string(le) + (!nice_msg.empty() ? (", " + nice_msg) : "") + ").";
+    }
+
+    const char* what() const noexcept {
+        return msg.c_str();
+    }
+
+private:
+    string msg;
+};
+#endif
+
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
@@ -1597,10 +1664,36 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     try {
         archive_read_support_format_zip(a);
 
+#ifdef _WIN32
+        h = CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                        FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h == INVALID_HANDLE_VALUE)
+            throw last_error("CreateFile", GetLastError());
+
+        auto r = archive_read_open(a, this, archive_dummy_callback,
+                                   [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
+                                       auto impl = (workbook_pimpl*)client_data;
+                                       DWORD read;
+
+                                       if (!ReadFile(impl->h, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
+                                           archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
+                                           return -1;
+                                       }
+
+                                       *buffer = impl->readbuf;
+
+                                       return read;
+                                   }, archive_dummy_callback);
+
+        if (r != ARCHIVE_OK)
+            throw runtime_error(archive_error_string(a));
+#else
         auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
 
         if (r != ARCHIVE_OK)
             throw runtime_error(archive_error_string(a));
+#endif
+
 
         unordered_map<string, file> files;
 
@@ -1645,15 +1738,26 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         auto& wb = find_workbook(files);
 
         parse_workbook(wb.first, wb.second.data, files);
-
-        // FIXME
     } catch (...) {
         archive_read_free(a);
+
+#ifdef _WIN32
+        if (h != INVALID_HANDLE_VALUE)
+            CloseHandle(h);
+#endif
+
         throw;
     }
 
     archive_read_free(a);
 }
+
+#ifdef _WIN32
+workbook_pimpl::~workbook_pimpl() {
+    if (h != INVALID_HANDLE_VALUE)
+        CloseHandle(h);
+}
+#endif
 
 workbook::workbook(const filesystem::path& fn) {
     impl = new workbook_pimpl(fn);
@@ -1781,5 +1885,29 @@ variant<int64_t, string, double, date, time, datetime, bool, nullptr_t> cell::va
 
     return v;
 }
+
+#ifdef _WIN32
+void workbook_pimpl::rename(const std::filesystem::path& fn) const {
+    vector<uint8_t> buf;
+    auto dest = fn.u16string();
+
+    buf.resize(offsetof(FILE_RENAME_INFO, FileName) + ((dest.length() + 1) * sizeof(char16_t)));
+
+    auto fri = (FILE_RENAME_INFO*)buf.data();
+
+    fri->ReplaceIfExists = true;
+    fri->RootDirectory = nullptr;
+    fri->FileNameLength = (DWORD)(dest.length() * sizeof(char16_t));
+    memcpy(fri->FileName, dest.data(), fri->FileNameLength);
+    fri->FileName[dest.length()] = 0;
+
+    if (!SetFileInformationByHandle(h, FileRenameInfo, fri, (DWORD)buf.size()))
+        throw last_error("SetFileInformationByHandle", GetLastError());
+}
+
+void workbook::rename(const std::filesystem::path& fn) const {
+    impl->rename(fn);
+}
+#endif
 
 }
