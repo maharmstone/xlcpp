@@ -101,16 +101,14 @@ static void resolve_reference(const string_view& sv, unsigned int& row, unsigned
     if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
         col = sv[0] - 'A';
         row = stoi(string(sv.data() + 1, sv.length() - 1)) - 1;
-        return;
     } else if (sv.length() >= 3 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= '0' && sv[2] <= '9') {
         col = ((sv[0] - 'A' + 1) * 26) + sv[1] - 'A';
         row = stoi(string(sv.data() + 2, sv.length() - 2)) - 1;
-        return;
-    }
-
-    // FIXME - support three-letter columns
-
-    throw formatted_error(FMT_STRING("Malformed reference \"{}\"."), sv);
+    } else if (sv.length() >= 4 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= 'A' && sv[2] <= 'Z' && sv[3] >= '0' && sv[3] <= '9') {
+        col = ((sv[0] - 'A' + 1) * 676) + ((sv[1] - 'A' + 1) * 26) + sv[2] - 'A';
+        row = stoi(string(sv.data() + 3, sv.length() - 3)) - 1;
+    } else
+        throw formatted_error(FMT_STRING("Malformed reference \"{}\"."), sv);
 }
 
 string sheet_pimpl::xml() const {
