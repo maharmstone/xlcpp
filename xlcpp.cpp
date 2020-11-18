@@ -80,7 +80,7 @@ private:
 };
 
 static string make_reference(unsigned int row, unsigned int col) {
-    char colstr[4];
+    char colstr[5];
 
     col--;
 
@@ -88,10 +88,15 @@ static string make_reference(unsigned int row, unsigned int col) {
         colstr[0] = col + 'A';
         colstr[1] = 0;
     } else if (col < 702) {
-        colstr[0] = ((col / 26) - 1) + 'A';
+        colstr[0] = (col / 26) - 1 + 'A';
         colstr[1] = (col % 26) + 'A';
         colstr[2] = 0;
-    } else // FIXME - support three-letter columns
+    } else if (col < 16384) {
+        colstr[0] = (col / 676) - 1 + 'A';
+        colstr[1] = ((col / 26) % 26) - 1 + 'A';
+        colstr[2] = (col % 26) + 'A';
+        colstr[3] = 0;
+    } else
         throw formatted_error(FMT_STRING("Column {} too large."), col);
 
     return string(colstr) + to_string(row);
