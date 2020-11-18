@@ -64,6 +64,21 @@ sheet& workbook::add_sheet(const string& name, bool visible) {
     return impl->add_sheet(name, visible);
 }
 
+class formatted_error : public exception {
+public:
+    template<typename T, typename... Args>
+    formatted_error(T&& s, Args&&... args) {
+        msg = fmt::format(s, forward<Args>(args)...);
+    }
+
+    const char* what() const noexcept {
+        return msg.c_str();
+    }
+
+private:
+    string msg;
+};
+
 static string make_reference(unsigned int row, unsigned int col) {
     char colstr[4];
 
@@ -77,7 +92,7 @@ static string make_reference(unsigned int row, unsigned int col) {
         colstr[1] = (col % 26) + 'A';
         colstr[2] = 0;
     } else // FIXME - support three-letter columns
-        throw runtime_error("Column " + to_string(col) + " too large.");
+        throw formatted_error(FMT_STRING("Column {} too large."), col);
 
     return string(colstr) + to_string(row);
 }
@@ -95,7 +110,7 @@ static void resolve_reference(const string_view& sv, unsigned int& row, unsigned
 
     // FIXME - support three-letter columns
 
-    throw runtime_error("Malformed reference \"" + string(sv) + "\".");
+    throw formatted_error(FMT_STRING("Malformed reference \"{}\"."), sv);
 }
 
 string sheet_pimpl::xml() const {
@@ -169,7 +184,7 @@ string sheet_pimpl::xml() const {
             } else if (holds_alternative<nullptr_t>(c.impl->val)) {
                 // nop
             } else
-                throw runtime_error("Unknown type for cell.");
+                throw formatted_error(FMT_STRING("Unknown type for cell."));
 
             writer.end_element();
         }
@@ -665,7 +680,7 @@ string workbook_pimpl::data() const {
                                 },
                                 archive_dummy_callback);
         if (ret != ARCHIVE_OK)
-            throw runtime_error("archive_write_open returned " + to_string(ret) + ".");
+            throw formatted_error(FMT_STRING("archive_write_open returned {}."), ret);
 
         write_archive(a);
 
@@ -906,7 +921,7 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "Types" || r.namespace_uri() != NS_CONTENT_TYPES)
-                    throw runtime_error("Root tag name was not \"Types\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"Types\"."));
             } else if (depth == 1) {
                 if (r.local_name() == "Default" && r.namespace_uri() == NS_CONTENT_TYPES) {
                     string ext, ct;
@@ -970,7 +985,7 @@ static const pair<const string, file>& find_workbook(const unordered_map<string,
             return f;
     }
 
-    throw runtime_error("Could not find workbook XML file.");
+    throw formatted_error(FMT_STRING("Could not find workbook XML file."));
 }
 
 static unordered_map<string, string> read_relationships(const string& fn, const unordered_map<string, file>& files) {
@@ -989,7 +1004,7 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
     }
 
     if (files.count(ps) == 0)
-        throw runtime_error("File " + ps + " not found.");
+        throw formatted_error(FMT_STRING("File {} not found."), ps);
 
     xml_reader r(files.at(ps).data);
     unsigned int depth = 0;
@@ -1007,7 +1022,7 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "Relationships" || r.namespace_uri() != NS_PACKAGE_RELATIONSHIPS)
-                    throw runtime_error("Root tag name was not \"Relationships\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"Relationships\"."));
             } else if (depth == 1) {
                 if (r.local_name() == "Relationship" && r.namespace_uri() == NS_PACKAGE_RELATIONSHIPS) {
                     string id, target;
@@ -1200,7 +1215,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "worksheet" || r.namespace_uri() != NS_SPREADSHEET)
-                    throw runtime_error("Root tag name was not \"worksheet\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"worksheet\"."));
             } else if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                 in_sheet_data = true;
             else if (in_sheet_data) {
@@ -1217,10 +1232,10 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     });
 
                     if (row_index == 0)
-                        throw runtime_error("No row index given.");
+                        throw formatted_error(FMT_STRING("No row index given."));
 
                     if (row_index <= last_index)
-                        throw runtime_error("Rows out of order.");
+                        throw formatted_error(FMT_STRING("Rows out of order."));
 
                     while (last_index + 1 < row_index) {
                         s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
@@ -1250,15 +1265,15 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     });
 
                     if (r_val.empty())
-                        throw runtime_error("Cell had no r value.");
+                        throw formatted_error(FMT_STRING("Cell had no r value."));
 
                     resolve_reference(r_val, row_num, col_num);
 
                     if (row_num + 1 != last_index)
-                        throw runtime_error("Cell was in wrong row.");
+                        throw formatted_error(FMT_STRING("Cell was in wrong row."));
 
                     if (col_num < last_col)
-                        throw runtime_error("Cells out of order.");
+                        throw formatted_error(FMT_STRING("Cells out of order."));
 
                     while (last_col < col_num) {
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
@@ -1361,7 +1376,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                         c->impl->val = decode_escape_sequences(v_val);
                     }
                 } else
-                    throw runtime_error("Unhandled cell type value \"" + t_val + "\".");
+                    throw formatted_error(FMT_STRING("Unhandled cell type value \"{}\"."), t_val);
 
                 if (!s_val.empty())
                     c->impl->number_format = number_format;
@@ -1404,7 +1419,7 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "workbook" || r.namespace_uri() != NS_SPREADSHEET)
-                    throw runtime_error("Root tag name was not \"workbook\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"workbook\"."));
             } else if (depth == 1) {
                 if (r.local_name() == "workbookPr" && r.namespace_uri() == NS_SPREADSHEET) {
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
@@ -1461,7 +1476,7 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
                 }
 
                 if (files.count(ns) == 0)
-                    throw runtime_error("File " + ns + " not found.");
+                    throw formatted_error(FMT_STRING("File {} not found."), ns);
 
                 load_sheet(sr.name, files.at(ns).data, sr.visible);
                 break;
@@ -1489,7 +1504,7 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "sst" || r.namespace_uri() != NS_SPREADSHEET)
-                    throw runtime_error("Root tag name was not \"sst\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"sst\"."));
             } else if (depth == 1) {
                 if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
                     in_si = true;
@@ -1537,7 +1552,7 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
         if (r.node_type() == XML_READER_TYPE_ELEMENT) {
             if (depth == 0) {
                 if (r.local_name() != "styleSheet" || r.namespace_uri() != NS_SPREADSHEET)
-                    throw runtime_error("Root tag name was not \"styleSheet\".");
+                    throw formatted_error(FMT_STRING("Root tag name was not \"styleSheet\"."));
             } else if (depth == 1) {
                 if (r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                     in_numfmts = true;
@@ -1609,7 +1624,7 @@ __inline string utf16_to_utf8(const u16string_view& s) {
                                    nullptr, nullptr);
 
     if (len == 0)
-        throw runtime_error("WideCharToMultiByte 1 failed.");
+        throw formatted_error(FMT_STRING("WideCharToMultiByte 1 failed."));
 
     ret.resize(len);
 
@@ -1617,7 +1632,7 @@ __inline string utf16_to_utf8(const u16string_view& s) {
                               nullptr, nullptr);
 
     if (len == 0)
-        throw runtime_error("WideCharToMultiByte 2 failed.");
+        throw formatted_error(FMT_STRING("WideCharToMultiByte 2 failed."));
 
     return ret;
 }
@@ -1690,12 +1705,12 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
                                    }, archive_dummy_callback);
 
         if (r != ARCHIVE_OK)
-            throw runtime_error(archive_error_string(a));
+            throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
 #else
         auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
 
         if (r != ARCHIVE_OK)
-            throw runtime_error(archive_error_string(a));
+            throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
 #endif
 
 
@@ -1731,7 +1746,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         }
 
         if (files.count("[Content_Types].xml") == 0)
-            throw runtime_error("[Content_Types].xml not found.");
+            throw formatted_error(FMT_STRING("[Content_Types].xml not found."));
 
         parse_content_types(files.at("[Content_Types].xml").data, files);
 
