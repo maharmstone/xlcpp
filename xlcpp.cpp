@@ -1202,8 +1202,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
     bool in_sheet_data = false;
     unsigned int last_index = 0, last_col;
     row* row = nullptr;
-    string r_val, s_val, t_val, v_val;
-    bool in_v = false;
+    string r_val, s_val, t_val, v_val, is_val;
+    bool in_v = false, in_is = false;
 
     while (r.read()) {
         unsigned int next_depth;
@@ -1254,7 +1254,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                 } else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
                     unsigned int row_num, col_num;
 
-                    r_val = t_val = s_val = v_val = "";
+                    r_val = t_val = s_val = v_val = is_val = "";
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "r" && ns.empty())
@@ -1289,6 +1289,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                 } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
                     in_v = true;
+                else if (row && r.local_name() == "is" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                    in_is = true;
             }
         } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
             if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET)
@@ -1300,7 +1302,6 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                 string number_format;
 
                 // FIXME - d, date
-                // FIXME - inlineStr, inline string
 
                 if (!s_val.empty())
                     number_format = find_number_format(stoi(s_val));
@@ -1378,6 +1379,13 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                         // so we don't have to expose shared_string publicly
                         c->impl->val = decode_escape_sequences(v_val);
                     }
+                } else if (t_val == "inlineStr") { // inline string
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+
+                    if (!is_val.empty()) {
+                        // so we don't have to expose shared_string publicly
+                        c->impl->val = decode_escape_sequences(is_val);
+                    }
                 } else
                     throw formatted_error(FMT_STRING("Unhandled cell type value \"{}\"."), t_val);
 
@@ -1385,9 +1393,13 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     c->impl->number_format = number_format;
             } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
                 in_v = false;
+            else if (in_is && r.local_name() == "is" && r.namespace_uri() == NS_SPREADSHEET)
+                in_is = false;
         } else if (r.node_type() == XML_READER_TYPE_TEXT) {
             if (in_v)
                 v_val += r.value();
+            else if (in_is)
+                is_val += r.value();
         }
 
         depth = next_depth;
@@ -1885,7 +1897,9 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
                           dt.d.year, dt.d.month, dt.d.day, dt.t.hour, dt.t.minute, dt.t.second);
     } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
-    } else
+    } else if (holds_alternative<string>(c.impl->val))
+        os << get<string>(c.impl->val);
+    else
         os << "?";
 
     return os;
