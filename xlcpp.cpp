@@ -1094,7 +1094,8 @@ static bool is_date(const string_view& sv) {
     static const char* patterns[] = {
         "dmy",
         "ymd",
-        "mdy"
+        "mdy",
+        "my"
     };
 
     for (const auto& p : patterns) {
