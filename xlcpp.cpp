@@ -984,8 +984,10 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
 
 static const pair<const string, file>& find_workbook(const unordered_map<string, file>& files) {
     for (const auto& f : files) {
-        if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+        if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" ||
+            f.second.content_type == "application/vnd.ms-excel.sheet.macroEnabled.main+xml") {
             return f;
+        }
     }
 
     throw formatted_error(FMT_STRING("Could not find workbook XML file."));
