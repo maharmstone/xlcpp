@@ -1757,7 +1757,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
                         break;
 
                     if (read < 0)
-                        throw formatted_error("archive_read_data returned {} for {}", read, name.string());
+                        throw formatted_error(FMT_STRING("archive_read_data returned {} for {} ({})"), read, name.string(), archive_error_string(a));
 
                     buf += tmp.substr(0, read);
                 } while (true);
