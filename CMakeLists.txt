@@ -18,9 +18,9 @@ find_package(fmt REQUIRED)
 
 add_definitions(-DXLCPP_EXPORT)
 
-set(SRC_FILES xlcpp.cpp
-    xml-writer.cpp
-    xml-reader.cpp)
+set(SRC_FILES src/xlcpp.cpp
+    src/xml-writer.cpp
+    src/xml-reader.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
@@ -40,7 +40,7 @@ endif()
 target_include_directories(xlcpp PUBLIC "${LibArchive_INCLUDE_DIR}")
 target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
 
-set_target_properties(xlcpp PROPERTIES PUBLIC_HEADER xlcpp.h)
+set_target_properties(xlcpp PROPERTIES PUBLIC_HEADER src/xlcpp.h)
 
 install(TARGETS xlcpp
     EXPORT xlcpp-targets
@@ -59,8 +59,8 @@ if(BUILD_STATIC)
 endif()
 
 if(BUILD_SAMPLE)
-    add_executable(xltest xltest.cpp)
-    target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    add_executable(xltest src/xltest.cpp)
+    target_include_directories(xltest PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(xltest xlcpp)
     install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
 endif()
