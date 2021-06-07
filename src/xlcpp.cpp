@@ -641,7 +641,7 @@ void workbook_pimpl::save(const filesystem::path& fn) const {
     a = archive_write_new();
     archive_write_set_format_zip(a);
 
-    archive_write_open_filename(a, fn.u8string().c_str());
+    archive_write_open_filename(a, fn.string().c_str());
 
     write_archive(a);
 
@@ -999,9 +999,9 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
 
     p.remove_filename();
     p /= "_rels";
-    p /= filesystem::path(fn).filename().u8string() + ".rels";
+    p /= filesystem::path(fn).filename().string() + ".rels";
 
-    auto ps = p.u8string();
+    auto ps = p.string();
 
     for (auto& c : ps) {
         if (c == '\\')
@@ -1486,7 +1486,7 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
                 name.remove_filename();
                 name /= r.second;
 
-                auto ns = name.u8string();
+                auto ns = name.string();
 
                 for (auto& c : ns) {
                     if (c == '\\')
@@ -1725,7 +1725,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         if (r != ARCHIVE_OK)
             throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
 #else
-        auto r = archive_read_open_filename(a, fn.u8string().c_str(), BLOCK_SIZE);
+        auto r = archive_read_open_filename(a, fn.string().c_str(), BLOCK_SIZE);
 
         if (r != ARCHIVE_OK)
             throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
@@ -1737,7 +1737,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
             if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
                 filesystem::path name = archive_entry_pathname(entry);
-                auto ext = name.extension().u8string();
+                auto ext = name.extension().string();
 
                 for (auto& c : ext) {
                     if (c >= 'A' && c <= 'Z')
@@ -1762,7 +1762,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
                     buf += tmp.substr(0, read);
                 } while (true);
 
-                files[name.u8string()].data = buf;
+                files[name.string()].data = buf;
             }
         }
 
