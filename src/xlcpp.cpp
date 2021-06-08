@@ -850,24 +850,6 @@ cell::cell(row_pimpl& r, unsigned int num, nullptr_t) {
     impl = new cell_pimpl(r, num, nullptr);
 }
 
-unsigned int date::to_number(bool date1904) const {
-    int m2 = ((int)month - 14) / 12;
-    long long n;
-
-    n = (1461 * ((int)year + 4800 + m2)) / 4;
-    n += (367 * ((int)month - 2 - (12 * m2))) / 12;
-    n -= (3 * (((int)year + 4900 + m2)/100)) / 4;
-    n += day;
-    n -= 2447094;
-
-    if (date1904)
-        n -= 1462;
-    else if (n < 61) // Excel's 29/2/1900 bug
-        n--;
-
-    return n;
-}
-
 bool operator==(const font& lhs, const font& rhs) noexcept {
     return lhs.font_name == rhs.font_name &&
         lhs.font_size == rhs.font_size &&
@@ -884,7 +866,7 @@ double time::to_number() const {
 }
 
 double datetime::to_number(bool date1904) const {
-    return (double)d.to_number(date1904) + t.to_number();
+    return (double)date_to_number(d, date1904) + t.to_number();
 }
 
 void style::set_font(const std::string& font_name, unsigned int font_size, bool bold) {
@@ -917,55 +899,6 @@ void cell_pimpl::set_number_format(const std::string& fmt) {
 
 void cell::set_number_format(const std::string& fmt) {
     impl->set_number_format(fmt);
-}
-
-date::date(time_t tt) {
-    tm local_tm = *localtime(&tt);
-
-    year = local_tm.tm_year + 1900;
-    month = local_tm.tm_mon + 1;
-    day = local_tm.tm_mday;
-}
-
-void date::from_number(unsigned int num, bool date1904) {
-    unsigned int J = num + 2415019;
-    unsigned int f, e, g, h;
-
-    if (date1904)
-        J += 1462;
-    else if (num < 61) // Excel's 29/2/1900 bug
-        J++;
-
-    f = J;
-    f *= 4;
-    f += 274277;
-    f /= 146097;
-    f *= 3;
-    f /= 4;
-    f += J;
-    f += 1363;
-
-    e = (f * 4) + 3;
-
-    g = e % 1461;
-    g /= 4;
-
-    h = (5 * g) + 2;
-
-    day = h % 153;
-    day /= 5;
-    day++;
-
-    month = h;
-    month /= 153;
-    month += 2;
-    month %= 12;
-    month++;
-
-    year = 14 - month;
-    year /= 12;
-    year -= 4716;
-    year += e / 1461;
 }
 
 time::time(time_t tt) {
@@ -1393,9 +1326,9 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     if (dt && tm) {
                         auto d = stod(v_val);
                         auto n = (unsigned int)((d - (int)d) * 86400.0);
-                        datetime dt(1970, 1, 1, n / 3600, (n % 3600) / 60, n % 60);
+                        datetime dt(1970y, chrono::January, 1d, n / 3600, (n % 3600) / 60, n % 60);
 
-                        dt.d.from_number((int)d, date1904);
+                        dt.d = number_to_date((int)d, date1904);
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
                     } else if (dt) {
@@ -1975,7 +1908,7 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         const auto& dt = get<datetime>(c.impl->val);
 
         os << fmt::format(FMT_STRING("{:04}-{:02}-{:02} {:02}:{:02}:{:02}"),
-                          dt.d.year, dt.d.month, dt.d.day, dt.t.hour, dt.t.minute, dt.t.second);
+                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(), dt.t.hour, dt.t.minute, dt.t.second);
     } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
     } else if (holds_alternative<string>(c.impl->val))

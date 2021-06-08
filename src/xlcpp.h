@@ -64,17 +64,6 @@ public:
     sheet_pimpl* impl;
 };
 
-class XLCPP date {
-public:
-    date(unsigned int year, unsigned int month, unsigned int day) : year(year), month(month), day(day) { }
-    date(time_t tt);
-
-    unsigned int to_number(bool date1904 = false) const;
-    void from_number(unsigned int num, bool date1904 = false);
-
-    unsigned int year, month, day;
-};
-
 class XLCPP time {
 public:
     time(unsigned int hour, unsigned int minute, unsigned int second) : hour(hour), minute(minute), second(second) { }
@@ -87,14 +76,18 @@ public:
 
 class XLCPP datetime {
 public:
-    datetime(unsigned int year, unsigned int month, unsigned int day, unsigned int hour, unsigned int minute, unsigned int second):
+    datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, unsigned int hour, unsigned int minute, unsigned int second) :
         d(year, month, day), t(hour, minute, second) { }
-    datetime(time_t tt) : d(tt), t(tt) { }
-    datetime(const std::chrono::system_clock::time_point& tp) : datetime(std::chrono::system_clock::to_time_t(tp)) { }
+
+    template<typename T>
+    constexpr datetime(const std::chrono::time_point<T>& chr) :
+        d(std::chrono::floor<std::chrono::days>(chr)),
+        t(std::chrono::floor<std::chrono::seconds>(chr - std::chrono::floor<std::chrono::days>(chr)).count()) {
+    }
 
     double to_number(bool date1904 = false) const;
 
-    date d;
+    std::chrono::year_month_day d;
     time t;
 };
 
