@@ -863,12 +863,8 @@ bool operator==(const style& lhs, const style& rhs) noexcept {
         lhs.font == rhs.font;
 }
 
-double time::to_number() const {
-    return (double)((hour * 3600) + (minute * 60) + second) / 86400.0;
-}
-
 double datetime::to_number(bool date1904) const {
-    return (double)date_to_number(d, date1904) + t.to_number();
+    return (double)date_to_number(d, date1904) + ((double)t.count() / 86400.0);
 }
 
 void style::set_font(const string& font_name, unsigned int font_size, bool bold) {
@@ -901,14 +897,6 @@ void cell_pimpl::set_number_format(const string& fmt) {
 
 void cell::set_number_format(const string& fmt) {
     impl->set_number_format(fmt);
-}
-
-time::time(time_t tt) {
-    tm local_tm = *localtime(&tt);
-
-    hour = local_tm.tm_hour;
-    minute = local_tm.tm_min;
-    second = local_tm.tm_sec;
 }
 
 workbook::workbook() {
@@ -1328,7 +1316,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     if (dt && tm) {
                         auto d = stod(v_val);
                         auto n = (unsigned int)((d - (int)d) * 86400.0);
-                        datetime dt(1970y, chrono::January, 1d, n / 3600, (n % 3600) / 60, n % 60);
+                        datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
 
                         dt.d = number_to_date((int)d, date1904);
 
@@ -1907,9 +1895,11 @@ ostream& operator<<(ostream& os, const cell& c) {
         os << fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), t.hours().count(), t.minutes().count(), t.seconds().count());
     } else if (holds_alternative<datetime>(c.impl->val)) {
         const auto& dt = get<datetime>(c.impl->val);
+        const auto& t = chrono::hh_mm_ss{dt.t};
 
         os << fmt::format(FMT_STRING("{:04}-{:02}-{:02} {:02}:{:02}:{:02}"),
-                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(), dt.t.hour, dt.t.minute, dt.t.second);
+                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                          t.hours().count(), t.minutes().count(), t.seconds().count());
     } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
     } else if (holds_alternative<string>(c.impl->val))

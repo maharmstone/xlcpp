@@ -64,20 +64,12 @@ public:
     sheet_pimpl* impl;
 };
 
-class XLCPP time {
-public:
-    time(unsigned int hour, unsigned int minute, unsigned int second) : hour(hour), minute(minute), second(second) { }
-    time(time_t tt);
-
-    double to_number() const;
-
-    unsigned int hour, minute, second;
-};
-
 class XLCPP datetime {
 public:
-    datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, unsigned int hour, unsigned int minute, unsigned int second) :
-        d(year, month, day), t(hour, minute, second) { }
+    constexpr datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, std::chrono::hours hour, std::chrono::minutes minute, std::chrono::seconds second) :
+        d(year, month, day), t(hour + minute + second) { }
+    constexpr datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, std::chrono::seconds t) :
+        d(year, month, day), t(t) { }
 
     template<typename T>
     constexpr datetime(const std::chrono::time_point<T>& chr) :
@@ -88,7 +80,7 @@ public:
     double to_number(bool date1904 = false) const;
 
     std::chrono::year_month_day d;
-    time t;
+    std::chrono::seconds t;
 };
 
 class row_pimpl;
