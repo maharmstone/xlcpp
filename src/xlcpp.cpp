@@ -4,6 +4,7 @@
 #include <archive_entry.h>
 #include <vector>
 #include <array>
+#include <charconv>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1579,9 +1580,12 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                     string format_code;
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
-                        if (name == "numFmtId" && ns.empty())
-                            id = stoi(value);
-                        else if (name == "formatCode" && ns.empty())
+                        if (name == "numFmtId" && ns.empty()) {
+                            auto fcr = from_chars(value.data(), value.data() + value.length(), id);
+
+                            if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
+                                throw formatted_error("Failed to parse numFmtId value {}.", value);
+                        } else if (name == "formatCode" && ns.empty())
                             format_code = value;
 
                         return true;
@@ -1594,9 +1598,16 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                     bool apply_number_format = true;
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
-                        if (name == "numFmtId" && ns.empty())
-                            numfmtid = stoi(value);
-                        else if (name == "applyNumberFormat" && ns.empty())
+                        if (name == "numFmtId" && ns.empty()) {
+                            unsigned int num;
+
+                            auto fcr = from_chars(value.data(), value.data() + value.length(), num);
+
+                            if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
+                                throw formatted_error("Failed to parse numFmtId value {}.", value);
+
+                            numfmtid = num;
+                        } else if (name == "applyNumberFormat" && ns.empty())
                             apply_number_format = value == "true" || value == "1";
 
                         return true;
