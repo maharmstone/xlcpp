@@ -22,7 +22,7 @@ static void main2() {
     row2.add_cell(42.1);
     row2.add_cell(true);
 
-    auto& c2 = row2.add_cell(xlcpp::date{1998, 7, 5});
+    auto& c2 = row2.add_cell(chrono::year_month_day{1998y, chrono::July, 5d});
     c2.set_number_format("YYYY-MM-DD");
     c2.set_font("Comic Sans MS", 12);
 

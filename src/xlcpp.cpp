@@ -116,6 +116,81 @@ static void resolve_reference(const string_view& sv, unsigned int& row, unsigned
         throw formatted_error(FMT_STRING("Malformed reference \"{}\"."), sv);
 }
 
+constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, bool date1904) {
+    int m2 = ((int)(unsigned int)ymd.month() - 14) / 12;
+    long long n;
+
+    n = (1461 * ((int)ymd.year() + 4800 + m2)) / 4;
+    n += (367 * ((int)(unsigned int)ymd.month() - 2 - (12 * m2))) / 12;
+    n -= (3 * (((int)ymd.year() + 4900 + m2)/100)) / 4;
+    n += (unsigned int)ymd.day();
+    n -= 2447094;
+
+    if (date1904)
+        n -= 1462;
+    else if (n < 61) // Excel's 29/2/1900 bug
+        n--;
+
+    return n;
+}
+
+static_assert(date_to_number(chrono::year_month_day{1900y, chrono::January, 1d}, false) == 1);
+static_assert(date_to_number(chrono::year_month_day{1900y, chrono::February, 28d}, false) == 59);
+static_assert(date_to_number(chrono::year_month_day{1900y, chrono::March, 1d}, false) == 61);
+static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, false) == 35981);
+static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, true) == 34519);
+
+constexpr chrono::year_month_day number_to_date(unsigned int num, bool date1904) {
+    unsigned int J = num + 2415019;
+    unsigned int f, e, g, h;
+    unsigned int day, month;
+    int year;
+
+    if (date1904)
+        J += 1462;
+    else if (num < 61) // Excel's 29/2/1900 bug
+        J++;
+
+    f = J;
+    f *= 4;
+    f += 274277;
+    f /= 146097;
+    f *= 3;
+    f /= 4;
+    f += J;
+    f += 1363;
+
+    e = (f * 4) + 3;
+
+    g = e % 1461;
+    g /= 4;
+
+    h = (5 * g) + 2;
+
+    day = h % 153;
+    day /= 5;
+    day++;
+
+    month = h;
+    month /= 153;
+    month += 2;
+    month %= 12;
+    month++;
+
+    year = 14 - month;
+    year /= 12;
+    year -= 4716;
+    year += e / 1461;
+
+    return chrono::year_month_day{chrono::year{year}, chrono::month{month}, chrono::day{day}};
+}
+
+static_assert(number_to_date(1, false) == chrono::year_month_day{1900y, chrono::January, 1d});
+static_assert(number_to_date(59, false) == chrono::year_month_day{1900y, chrono::February, 28d});
+static_assert(number_to_date(61, false) == chrono::year_month_day{1900y, chrono::March, 1d});
+static_assert(number_to_date(35981, false) == chrono::year_month_day{1998y, chrono::July, 5d});
+static_assert(number_to_date(34519, true) == chrono::year_month_day{1998y, chrono::July, 5d});
+
 string sheet_pimpl::xml() const {
     xml_writer writer;
 
@@ -160,11 +235,11 @@ string sheet_pimpl::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(get<double>(c.impl->val)));
                 writer.end_element();
-            } else if (holds_alternative<date>(c.impl->val)) {
+            } else if (holds_alternative<chrono::year_month_day>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<date>(c.impl->val).to_number(parent.date1904)));
+                writer.text(to_string(date_to_number(get<chrono::year_month_day>(c.impl->val), parent.date1904)));
                 writer.end_element();
             } else if (holds_alternative<time>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
@@ -725,7 +800,7 @@ shared_string workbook_pimpl::get_shared_string(const string& s) {
 
 template<typename T>
 cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), num(num), val(t) {
-    if constexpr (std::is_same_v<T, date>)
+    if constexpr (std::is_same_v<T, std::chrono::year_month_day>)
         sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
     else if constexpr (std::is_same_v<T, time>)
         sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
@@ -751,7 +826,7 @@ cell::cell(row_pimpl& r, unsigned int num, double val) {
     impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const date& val) {
+cell::cell(row_pimpl& r, unsigned int num, const chrono::year_month_day& val) {
     impl = new cell_pimpl(r, num, val);
 }
 
@@ -1324,7 +1399,6 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
                     } else if (dt) {
-                        date d(1970, 1, 1);
                         int num;
                         bool valid_num = true;
 
@@ -1335,8 +1409,9 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                         }
 
                         if (valid_num) {
-                            d.from_number(num, date1904);
-                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                            auto ymd = number_to_date(num, date1904);
+
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
                         } else
                             c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     } else if (tm) {
@@ -1835,7 +1910,7 @@ cell& row::add_cell(double val) {
     return impl->add_cell(val);
 }
 
-cell& row::add_cell(const date& val) {
+cell& row::add_cell(const chrono::year_month_day& val) {
     return impl->add_cell(val);
 }
 
@@ -1888,18 +1963,18 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << (get<bool>(c.impl->val) ? "true" : "false");
     else if (holds_alternative<shared_string>(c.impl->val))
         os << c.impl->parent.parent.parent.shared_strings2[get<shared_string>(c.impl->val).num];
-    else if (holds_alternative<date>(c.impl->val)) {
-        const auto& d = get<date>(c.impl->val);
+    else if (holds_alternative<std::chrono::year_month_day>(c.impl->val)) {
+        const auto& d = get<std::chrono::year_month_day>(c.impl->val);
 
-        os << fmt::format("{:04}-{:02}-{:02}", d.year, d.month, d.day);
+        os << fmt::format(FMT_STRING("{:04}-{:02}-{:02}"), (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
     } else if (holds_alternative<time>(c.impl->val)) {
         const auto& t = get<time>(c.impl->val);
 
-        os << fmt::format("{:02}:{:02}:{:02}", t.hour, t.minute, t.second);
+        os << fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), t.hour, t.minute, t.second);
     } else if (holds_alternative<datetime>(c.impl->val)) {
         const auto& dt = get<datetime>(c.impl->val);
 
-        os << fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        os << fmt::format(FMT_STRING("{:04}-{:02}-{:02} {:02}:{:02}:{:02}"),
                           dt.d.year, dt.d.month, dt.d.day, dt.t.hour, dt.t.minute, dt.t.second);
     } else if (holds_alternative<nullptr_t>(c.impl->val)) {
         // nop
@@ -1915,7 +1990,7 @@ std::string cell::get_number_format() const {
     return impl->number_format;
 }
 
-variant<int64_t, string, double, date, time, datetime, bool, nullptr_t> cell::value() const {
+cell_t cell::value() const {
     decltype(value()) v;
 
     visit([&](auto&& arg) {

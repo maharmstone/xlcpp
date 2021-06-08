@@ -171,7 +171,7 @@ public:
     const style* sty;
 
     unsigned int num;
-    std::variant<int64_t, shared_string, double, date, time, datetime, bool, std::nullptr_t, std::string> val;
+    std::variant<int64_t, shared_string, double, std::chrono::year_month_day, time, datetime, bool, std::nullptr_t, std::string> val;
     std::string number_format;
 };
 
