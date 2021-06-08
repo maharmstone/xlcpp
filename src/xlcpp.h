@@ -77,8 +77,6 @@ public:
         t(std::chrono::floor<std::chrono::seconds>(chr - std::chrono::floor<std::chrono::days>(chr)).count()) {
     }
 
-    double to_number(bool date1904 = false) const;
-
     std::chrono::year_month_day d;
     std::chrono::seconds t;
 };

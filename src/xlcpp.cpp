@@ -191,6 +191,10 @@ static_assert(number_to_date(61, false) == chrono::year_month_day{1900y, chrono:
 static_assert(number_to_date(35981, false) == chrono::year_month_day{1998y, chrono::July, 5d});
 static_assert(number_to_date(34519, true) == chrono::year_month_day{1998y, chrono::July, 5d});
 
+static double datetime_to_number(const datetime& dt, bool date1904) {
+    return (double)date_to_number(dt.d, date1904) + ((double)dt.t.count() / 86400.0);
+}
+
 string sheet_pimpl::xml() const {
     xml_writer writer;
 
@@ -253,7 +257,7 @@ string sheet_pimpl::xml() const {
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<datetime>(c.impl->val).to_number(parent.date1904)));
+                writer.text(to_string(datetime_to_number(get<datetime>(c.impl->val), parent.date1904)));
                 writer.end_element();
             } else if (holds_alternative<bool>(c.impl->val)) {
                 writer.attribute("t", "b"); // bool
@@ -861,10 +865,6 @@ bool operator==(const font& lhs, const font& rhs) noexcept {
 bool operator==(const style& lhs, const style& rhs) noexcept {
     return lhs.number_format == rhs.number_format &&
         lhs.font == rhs.font;
-}
-
-double datetime::to_number(bool date1904) const {
-    return (double)date_to_number(d, date1904) + ((double)t.count() / 86400.0);
 }
 
 void style::set_font(const string& font_name, unsigned int font_size, bool bold) {
