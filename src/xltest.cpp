@@ -26,7 +26,7 @@ static void main2() {
     c2.set_number_format("YYYY-MM-DD");
     c2.set_font("Comic Sans MS", 12);
 
-    row2.add_cell(xlcpp::time{12, 34, 56});
+    row2.add_cell(chrono::hours{12} + chrono::minutes{34} + chrono::seconds{56});
 
     row2.add_cell(chrono::system_clock::now());
 

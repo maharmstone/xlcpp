@@ -241,11 +241,13 @@ string sheet_pimpl::xml() const {
                 writer.start_element("v");
                 writer.text(to_string(date_to_number(get<chrono::year_month_day>(c.impl->val), parent.date1904)));
                 writer.end_element();
-            } else if (holds_alternative<time>(c.impl->val)) {
+            } else if (holds_alternative<chrono::seconds>(c.impl->val)) {
+                auto s = (double)get<chrono::seconds>(c.impl->val).count() / 86400.0;
+
                 writer.attribute("t", "n"); // number
 
                 writer.start_element("v");
-                writer.text(to_string(get<time>(c.impl->val).to_number()));
+                writer.text(to_string(s));
                 writer.end_element();
             } else if (holds_alternative<datetime>(c.impl->val)) {
                 writer.attribute("t", "n"); // number
@@ -802,7 +804,7 @@ template<typename T>
 cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), num(num), val(t) {
     if constexpr (std::is_same_v<T, std::chrono::year_month_day>)
         sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
-    else if constexpr (std::is_same_v<T, time>)
+    else if constexpr (std::is_same_v<T, chrono::seconds>)
         sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
     else if constexpr (std::is_same_v<T, datetime>)
         sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
@@ -830,7 +832,7 @@ cell::cell(row_pimpl& r, unsigned int num, const chrono::year_month_day& val) {
     impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const time& val) {
+cell::cell(row_pimpl& r, unsigned int num, const chrono::seconds& val) {
     impl = new cell_pimpl(r, num, val);
 }
 
@@ -1350,8 +1352,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     } else if (tm) {
                         auto n = (unsigned int)(stod(v_val) * 86400.0);
 
-                        n %= 86400;
-                        time t(n / 3600, (n % 3600) / 60, n % 60);
+                        chrono::seconds t{n % 86400};
 
                         c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
                     } else {
@@ -1847,7 +1848,7 @@ cell& row::add_cell(const chrono::year_month_day& val) {
     return impl->add_cell(val);
 }
 
-cell& row::add_cell(const time& val) {
+cell& row::add_cell(const chrono::seconds& val) {
     return impl->add_cell(val);
 }
 
@@ -1900,10 +1901,10 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         const auto& d = get<std::chrono::year_month_day>(c.impl->val);
 
         os << fmt::format(FMT_STRING("{:04}-{:02}-{:02}"), (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
-    } else if (holds_alternative<time>(c.impl->val)) {
-        const auto& t = get<time>(c.impl->val);
+    } else if (holds_alternative<chrono::seconds>(c.impl->val)) {
+        const auto& t = chrono::hh_mm_ss{get<chrono::seconds>(c.impl->val)};
 
-        os << fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), t.hour, t.minute, t.second);
+        os << fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), t.hours().count(), t.minutes().count(), t.seconds().count());
     } else if (holds_alternative<datetime>(c.impl->val)) {
         const auto& dt = get<datetime>(c.impl->val);
 

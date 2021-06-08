@@ -94,7 +94,7 @@ public:
 class row_pimpl;
 class cell_pimpl;
 
-using cell_t = std::variant<int64_t, std::string, double, std::chrono::year_month_day, time, datetime, bool, std::nullptr_t>;
+using cell_t = std::variant<int64_t, std::string, double, std::chrono::year_month_day, std::chrono::seconds, datetime, bool, std::nullptr_t>;
 
 class XLCPP cell {
 public:
@@ -103,7 +103,7 @@ public:
     cell(row_pimpl& r, unsigned int num, const std::string& val);
     cell(row_pimpl& r, unsigned int num, double val);
     cell(row_pimpl& r, unsigned int num, const std::chrono::year_month_day& val);
-    cell(row_pimpl& r, unsigned int num, const time& val);
+    cell(row_pimpl& r, unsigned int num, const std::chrono::seconds& val);
     cell(row_pimpl& r, unsigned int num, const datetime& val);
     cell(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val);
     cell(row_pimpl& r, unsigned int num, bool val);
@@ -130,7 +130,7 @@ public:
     cell& add_cell(const std::string& val);
     cell& add_cell(double val);
     cell& add_cell(const std::chrono::year_month_day& val);
-    cell& add_cell(const time& val);
+    cell& add_cell(const std::chrono::seconds& val);
     cell& add_cell(const datetime& val);
     cell& add_cell(const std::chrono::system_clock::time_point& val);
     cell& add_cell(bool val);
