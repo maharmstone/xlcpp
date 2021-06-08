@@ -802,11 +802,11 @@ shared_string workbook_pimpl::get_shared_string(const string& s) {
 
 template<typename T>
 cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), num(num), val(t) {
-    if constexpr (std::is_same_v<T, std::chrono::year_month_day>)
+    if constexpr (is_same_v<T, chrono::year_month_day>)
         sty = parent.parent.parent.find_style(style("dd/mm/yy", "Arial", 10)); // FIXME - localization
-    else if constexpr (std::is_same_v<T, chrono::seconds>)
+    else if constexpr (is_same_v<T, chrono::seconds>)
         sty = parent.parent.parent.find_style(style("HH:MM:SS", "Arial", 10)); // FIXME - localization
-    else if constexpr (std::is_same_v<T, datetime>)
+    else if constexpr (is_same_v<T, datetime>)
         sty = parent.parent.parent.find_style(style("dd/mm/yy HH:MM:SS", "Arial", 10)); // FIXME - localization
     else
         sty = parent.parent.parent.find_style(style("General", "Arial", 10));
@@ -871,15 +871,15 @@ double datetime::to_number(bool date1904) const {
     return (double)date_to_number(d, date1904) + t.to_number();
 }
 
-void style::set_font(const std::string& font_name, unsigned int font_size, bool bold) {
+void style::set_font(const string& font_name, unsigned int font_size, bool bold) {
     this->font = xlcpp::font(font_name, font_size, bold);
 }
 
-void style::set_number_format(const std::string& fmt) {
+void style::set_number_format(const string& fmt) {
     number_format = fmt;
 }
 
-void cell_pimpl::set_font(const std::string& name, unsigned int size, bool bold) {
+void cell_pimpl::set_font(const string& name, unsigned int size, bool bold) {
     auto sty2 = *sty;
 
     sty2.set_font(name, size, bold);
@@ -887,11 +887,11 @@ void cell_pimpl::set_font(const std::string& name, unsigned int size, bool bold)
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_font(const std::string& name, unsigned int size, bool bold) {
+void cell::set_font(const string& name, unsigned int size, bool bold) {
     impl->set_font(name, size, bold);
 }
 
-void cell_pimpl::set_number_format(const std::string& fmt) {
+void cell_pimpl::set_number_format(const string& fmt) {
     auto sty2 = *sty;
 
     sty2.set_number_format(fmt);
@@ -899,7 +899,7 @@ void cell_pimpl::set_number_format(const std::string& fmt) {
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_number_format(const std::string& fmt) {
+void cell::set_number_format(const string& fmt) {
     impl->set_number_format(fmt);
 }
 
@@ -1816,7 +1816,7 @@ workbook::~workbook() {
     delete impl;
 }
 
-sheet::sheet(workbook_pimpl& wb, const std::string& name, unsigned int num, bool visible) {
+sheet::sheet(workbook_pimpl& wb, const string& name, unsigned int num, bool visible) {
     impl = new sheet_pimpl(wb, name, num, visible);
 }
 
@@ -1836,7 +1836,7 @@ cell& row::add_cell(int64_t val) {
     return impl->add_cell(val);
 }
 
-cell& row::add_cell(const std::string& val) {
+cell& row::add_cell(const string& val) {
     return impl->add_cell(val);
 }
 
@@ -1872,7 +1872,7 @@ const list<sheet>& workbook::sheets() const {
     return impl->sheets;
 }
 
-std::string sheet::name() const {
+string sheet::name() const {
     return impl->name;
 }
 
@@ -1880,15 +1880,15 @@ bool sheet::visible() const {
     return impl->visible;
 }
 
-const std::list<row>& sheet::rows() const {
+const list<row>& sheet::rows() const {
     return impl->rows;
 }
 
-const std::list<cell>& row::cells() const {
+const list<cell>& row::cells() const {
     return impl->cells;
 }
 
-std::ostream& operator<<(std::ostream& os, const cell& c) {
+ostream& operator<<(ostream& os, const cell& c) {
     if (holds_alternative<int64_t>(c.impl->val))
         os << get<int64_t>(c.impl->val);
     else if (holds_alternative<double>(c.impl->val))
@@ -1897,8 +1897,8 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
         os << (get<bool>(c.impl->val) ? "true" : "false");
     else if (holds_alternative<shared_string>(c.impl->val))
         os << c.impl->parent.parent.parent.shared_strings2[get<shared_string>(c.impl->val).num];
-    else if (holds_alternative<std::chrono::year_month_day>(c.impl->val)) {
-        const auto& d = get<std::chrono::year_month_day>(c.impl->val);
+    else if (holds_alternative<chrono::year_month_day>(c.impl->val)) {
+        const auto& d = get<chrono::year_month_day>(c.impl->val);
 
         os << fmt::format(FMT_STRING("{:04}-{:02}-{:02}"), (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
     } else if (holds_alternative<chrono::seconds>(c.impl->val)) {
@@ -1920,7 +1920,7 @@ std::ostream& operator<<(std::ostream& os, const cell& c) {
     return os;
 }
 
-std::string cell::get_number_format() const {
+string cell::get_number_format() const {
     return impl->number_format;
 }
 
@@ -1938,7 +1938,7 @@ cell_t cell::value() const {
 }
 
 #ifdef _WIN32
-void workbook_pimpl::rename(const std::filesystem::path& fn) const {
+void workbook_pimpl::rename(const filesystem::path& fn) const {
     vector<uint8_t> buf;
     auto dest = fn.u16string();
 
@@ -1956,7 +1956,7 @@ void workbook_pimpl::rename(const std::filesystem::path& fn) const {
         throw last_error("SetFileInformationByHandle", GetLastError());
 }
 
-void workbook::rename(const std::filesystem::path& fn) const {
+void workbook::rename(const filesystem::path& fn) const {
     impl->rename(fn);
 }
 #endif
