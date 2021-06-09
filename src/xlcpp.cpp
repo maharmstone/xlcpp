@@ -1703,42 +1703,29 @@ private:
 #endif
 
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
+#ifdef _WIN32
+    h = CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE)
+        throw last_error("CreateFile", GetLastError());
+
+    try {
+        new (this) workbook_pimpl(h);
+    } catch (...) {
+        CloseHandle(h);
+        throw;
+    }
+#else
     struct archive* a = archive_read_new();
     struct archive_entry* entry;
 
     try {
         archive_read_support_format_zip(a);
 
-#ifdef _WIN32
-        h = CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                        FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (h == INVALID_HANDLE_VALUE)
-            throw last_error("CreateFile", GetLastError());
-
-        auto r = archive_read_open(a, this, archive_dummy_callback,
-                                   [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
-                                       auto impl = (workbook_pimpl*)client_data;
-                                       DWORD read;
-
-                                       if (!ReadFile(impl->h, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
-                                           archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
-                                           return -1;
-                                       }
-
-                                       *buffer = impl->readbuf;
-
-                                       return read;
-                                   }, archive_dummy_callback);
-
-        if (r != ARCHIVE_OK)
-            throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
-#else
         auto r = archive_read_open_filename(a, fn.string().c_str(), BLOCK_SIZE);
 
         if (r != ARCHIVE_OK)
             throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
-#endif
-
 
         unordered_map<string, file> files;
 
@@ -1788,19 +1775,95 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         parse_workbook(wb.first, wb.second.data, files);
     } catch (...) {
         archive_read_free(a);
+        throw;
+    }
+
+    archive_read_free(a);
+#endif
+}
 
 #ifdef _WIN32
-        if (h != INVALID_HANDLE_VALUE)
-            CloseHandle(h);
-#endif
+workbook_pimpl::workbook_pimpl(HANDLE h) {
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
 
+    try {
+        archive_read_support_format_zip(a);
+
+        this->h2 = h;
+
+        auto r = archive_read_open(a, this, archive_dummy_callback,
+                                   [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
+                                       auto impl = (workbook_pimpl*)client_data;
+                                       DWORD read;
+
+                                       if (!ReadFile(impl->h2, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
+                                           archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
+                                           return -1;
+                                       }
+
+                                       *buffer = impl->readbuf;
+
+                                       return read;
+                                   }, archive_dummy_callback);
+
+        if (r != ARCHIVE_OK)
+            throw formatted_error(FMT_STRING("{}"), archive_error_string(a));
+
+        unordered_map<string, file> files;
+
+        while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
+                filesystem::path name = archive_entry_pathname(entry);
+                auto ext = name.extension().string();
+
+                for (auto& c : ext) {
+                    if (c >= 'A' && c <= 'Z')
+                        c = c - 'A' + 'a';
+                }
+
+                if (ext != ".xml" && ext != ".rels")
+                    continue;
+
+                string buf;
+                string tmp(BLOCK_SIZE, 0);
+
+                do {
+                    auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
+
+                    if (read == 0)
+                        break;
+
+                    if (read < 0)
+                        throw formatted_error(FMT_STRING("archive_read_data returned {} for {} ({})"), read, name.string(), archive_error_string(a));
+
+                    buf += tmp.substr(0, read);
+                } while (true);
+
+                files[name.string()].data = buf;
+            }
+        }
+
+        if (files.count("[Content_Types].xml") == 0)
+            throw formatted_error(FMT_STRING("[Content_Types].xml not found."));
+
+        parse_content_types(files.at("[Content_Types].xml").data, files);
+
+        load_shared_strings(files);
+
+        load_styles(files);
+
+        auto& wb = find_workbook(files);
+
+        parse_workbook(wb.first, wb.second.data, files);
+    } catch (...) {
+        archive_read_free(a);
         throw;
     }
 
     archive_read_free(a);
 }
 
-#ifdef _WIN32
 workbook_pimpl::~workbook_pimpl() {
     if (h != INVALID_HANDLE_VALUE)
         CloseHandle(h);
@@ -1810,6 +1873,12 @@ workbook_pimpl::~workbook_pimpl() {
 workbook::workbook(const filesystem::path& fn) {
     impl = new workbook_pimpl(fn);
 }
+
+#ifdef _WIN32
+workbook::workbook(HANDLE h) {
+    impl = new workbook_pimpl(h);
+}
+#endif
 
 workbook::~workbook() {
     delete impl;

@@ -73,6 +73,7 @@ public:
     workbook_pimpl() = default;
     workbook_pimpl(const std::filesystem::path& fn);
 #ifdef _WIN32
+    workbook_pimpl(HANDLE h);
     ~workbook_pimpl();
 #endif
     sheet& add_sheet(const std::string& name, bool visible);
@@ -123,6 +124,7 @@ public:
 
 #ifdef _WIN32
     HANDLE h = INVALID_HANDLE_VALUE;
+    HANDLE h2;
     uint8_t readbuf[1048576];
 #endif
 };

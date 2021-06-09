@@ -8,6 +8,8 @@
 
 #ifdef _WIN32
 
+#include <windows.h>
+
 #ifdef XLCPP_EXPORT
 #define XLCPP __declspec(dllexport)
 #elif !defined(XLCPP_STATIC)
@@ -37,6 +39,9 @@ class XLCPP workbook {
 public:
     workbook();
     workbook(const std::filesystem::path& fn);
+#ifdef _WIN32
+    workbook(HANDLE h);
+#endif
     ~workbook();
     sheet& add_sheet(const std::string& name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
