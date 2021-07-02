@@ -106,26 +106,81 @@ static string make_reference(unsigned int row, unsigned int col) {
     return string(colstr) + to_string(row);
 }
 
-static bool resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) noexcept {
+// hopefully from_chars will be constexpr some day - see P2291R0
+template<typename T>
+requires is_integral_v<T> && is_unsigned_v<T>
+static constexpr from_chars_result from_chars_constexpr(const char* first, const char* last, T& t) {
+    from_chars_result res;
+
+    res.ptr = first;
+    res.ec = {};
+
+    if (first == last || *first < '0' || *first > '9')
+        return res;
+
+    t = 0;
+
+    while (first != last && *first >= '0' && *first <= '9') {
+        t *= 10;
+        t += (T)(*first - '0');
+        first++;
+        res.ptr++;
+    }
+
+    return res;
+}
+
+static constexpr bool resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) noexcept {
     from_chars_result fcr;
 
     if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
         col = sv[0] - 'A';
-        fcr = from_chars(sv.data() + 1, sv.data() + sv.length(), row);
+        fcr = from_chars_constexpr(sv.data() + 1, sv.data() + sv.length(), row);
     } else if (sv.length() >= 3 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= '0' && sv[2] <= '9') {
         col = ((sv[0] - 'A' + 1) * 26) + sv[1] - 'A';
-        fcr = from_chars(sv.data() + 2, sv.data() + sv.length(), row);
+        fcr = from_chars_constexpr(sv.data() + 2, sv.data() + sv.length(), row);
     } else if (sv.length() >= 4 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= 'A' && sv[2] <= 'Z' && sv[3] >= '0' && sv[3] <= '9') {
         col = ((sv[0] - 'A' + 1) * 676) + ((sv[1] - 'A' + 1) * 26) + sv[2] - 'A';
-        fcr = from_chars(sv.data() + 3, sv.data() + sv.length(), row);
+        fcr = from_chars_constexpr(sv.data() + 3, sv.data() + sv.length(), row);
     } else
         return false;
 
     if (fcr.ptr != sv.data() + sv.length())
         return false;
 
+    row--;
+
     return true;
 }
+
+static constexpr bool test_resolve_reference(string_view sv, bool exp_valid, unsigned int exp_row,
+                                             unsigned int exp_col) noexcept {
+    bool valid;
+    unsigned int row, col;
+
+    valid = resolve_reference(sv, row, col);
+
+    if (!valid)
+        return !exp_valid;
+    else if (!exp_valid)
+        return false;
+
+    return row == exp_row && col == exp_col;
+}
+
+static_assert(test_resolve_reference("", false, 0, 0));
+static_assert(test_resolve_reference("A", false, 0, 0));
+static_assert(test_resolve_reference("1", false, 0, 0));
+static_assert(test_resolve_reference("A1", true, 0, 0));
+static_assert(test_resolve_reference("D3", true, 2, 3));
+static_assert(test_resolve_reference("Z255", true, 254, 25));
+static_assert(test_resolve_reference("AA", false, 0, 0));
+static_assert(test_resolve_reference("AA1", true, 0, 26));
+static_assert(test_resolve_reference("MH229", true, 228, 345));
+static_assert(test_resolve_reference("ZZ16383", true, 16382, 701));
+static_assert(test_resolve_reference("AAA", false, 0, 0));
+static_assert(test_resolve_reference("AAA1", true, 0, 702));
+static_assert(test_resolve_reference("AMJ1048576", true, 1048575, 1023));
 
 static constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, bool date1904) noexcept {
     int m2 = ((int)(unsigned int)ymd.month() - 14) / 12;
