@@ -1197,17 +1197,6 @@ static constexpr bool __inline is_hex(char c) noexcept {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
-static uint8_t __inline from_hex(char c) {
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    else if (c >= 'a' && c <= 'f')
-        return c - 'a' + 0xa;
-    else if (c >= 'A' && c <= 'F')
-        return c - 'A' + 0xa;
-
-    return 0;
-}
-
 static string decode_escape_sequences(const string_view& sv) {
     bool has_underscore = false;
 
@@ -1230,7 +1219,9 @@ static string decode_escape_sequences(const string_view& sv) {
 
     for (unsigned int i = 0; i < sv.length(); i++) {
         if (i + 6 < sv.length() && sv[i] == '_' && sv[i+1] == 'x' && is_hex(sv[i+2]) && is_hex(sv[i+3]) && is_hex(sv[i+4]) && is_hex(sv[i+5]) && sv[i+6] == '_') {
-            uint16_t val = (from_hex(sv[i+2]) << 12) | (from_hex(sv[i+3]) << 8) | (from_hex(sv[i+4]) << 4) | from_hex(sv[i+5]);
+            uint16_t val;
+
+            from_chars(&sv[i+2], &sv[i+6], val, 16);
 
             if (val < 0x80)
                 s += (char)val;
