@@ -151,7 +151,7 @@ static_assert(date_to_number(chrono::year_month_day{1900y, chrono::March, 1d}, f
 static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, false) == 35981);
 static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, true) == 34519);
 
-constexpr chrono::year_month_day number_to_date(unsigned int num, bool date1904) {
+static constexpr chrono::year_month_day number_to_date(unsigned int num, bool date1904) noexcept {
     unsigned int J = num + 2415019;
     unsigned int f, e, g, h;
     unsigned int day, month;
