@@ -257,7 +257,7 @@ static_assert(number_to_date(61, false) == chrono::year_month_day{1900y, chrono:
 static_assert(number_to_date(35981, false) == chrono::year_month_day{1998y, chrono::July, 5d});
 static_assert(number_to_date(34519, true) == chrono::year_month_day{1998y, chrono::July, 5d});
 
-static double datetime_to_number(const datetime& dt, bool date1904) {
+static constexpr double datetime_to_number(const datetime& dt, bool date1904) noexcept {
     return (double)date_to_number(dt.d, date1904) + ((double)dt.t.count() / 86400.0);
 }
 
