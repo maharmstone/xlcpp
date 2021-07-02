@@ -106,7 +106,7 @@ static string make_reference(unsigned int row, unsigned int col) {
     return string(colstr) + to_string(row);
 }
 
-static void resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) {
+static bool resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) noexcept {
     from_chars_result fcr;
 
     if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
@@ -119,10 +119,12 @@ static void resolve_reference(const string_view& sv, unsigned int& row, unsigned
         col = ((sv[0] - 'A' + 1) * 676) + ((sv[1] - 'A' + 1) * 26) + sv[2] - 'A';
         fcr = from_chars(sv.data() + 3, sv.data() + sv.length(), row);
     } else
-        throw formatted_error("Malformed reference \"{}\".", sv);
+        return false;
 
     if (fcr.ptr != sv.data() + sv.length())
-        throw formatted_error("Malformed reference \"{}\".", sv);
+        return false;
+
+    return true;
 }
 
 constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, bool date1904) {
@@ -1280,7 +1282,8 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     if (r_val.empty())
                         throw formatted_error("Cell had no r value.");
 
-                    resolve_reference(r_val, row_num, col_num);
+                    if (!resolve_reference(r_val, row_num, col_num))
+                        throw formatted_error("Malformed reference \"{}\".", r_val);
 
                     if (row_num + 1 != last_index)
                         throw formatted_error("Cell was in wrong row.");
