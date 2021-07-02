@@ -107,16 +107,21 @@ static string make_reference(unsigned int row, unsigned int col) {
 }
 
 static void resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) {
+    from_chars_result fcr;
+
     if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
         col = sv[0] - 'A';
-        row = stoi(string(sv.data() + 1, sv.length() - 1)) - 1;
+        fcr = from_chars(sv.data() + 1, sv.data() + sv.length(), row);
     } else if (sv.length() >= 3 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= '0' && sv[2] <= '9') {
         col = ((sv[0] - 'A' + 1) * 26) + sv[1] - 'A';
-        row = stoi(string(sv.data() + 2, sv.length() - 2)) - 1;
+        fcr = from_chars(sv.data() + 2, sv.data() + sv.length(), row);
     } else if (sv.length() >= 4 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= 'A' && sv[1] <= 'Z' && sv[2] >= 'A' && sv[2] <= 'Z' && sv[3] >= '0' && sv[3] <= '9') {
         col = ((sv[0] - 'A' + 1) * 676) + ((sv[1] - 'A' + 1) * 26) + sv[2] - 'A';
-        row = stoi(string(sv.data() + 3, sv.length() - 3)) - 1;
+        fcr = from_chars(sv.data() + 3, sv.data() + sv.length(), row);
     } else
+        throw formatted_error("Malformed reference \"{}\".", sv);
+
+    if (fcr.ptr != sv.data() + sv.length())
         throw formatted_error("Malformed reference \"{}\".", sv);
 }
 
