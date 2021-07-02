@@ -1193,7 +1193,7 @@ static bool is_time(const string_view& sv) {
     return s.find("hm") != string::npos;
 }
 
-static bool __inline is_hex(char c) {
+static constexpr bool __inline is_hex(char c) noexcept {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
