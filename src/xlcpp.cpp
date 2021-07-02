@@ -127,7 +127,7 @@ static bool resolve_reference(const string_view& sv, unsigned int& row, unsigned
     return true;
 }
 
-constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, bool date1904) {
+static constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, bool date1904) noexcept {
     int m2 = ((int)(unsigned int)ymd.month() - 14) / 12;
     long long n;
 
