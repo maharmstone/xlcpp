@@ -1285,7 +1285,11 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                     r.attributes_loop([&](const string& name, const string& ns, const string& value) {
                         if (name == "r" && ns.empty()) {
-                            row_index = stoi(value);
+                            auto [ptr, ec] = from_chars(value.data(), value.data() + value.length(), row_index);
+
+                            if (ptr != value.data() + value.length())
+                                throw formatted_error("Invalid r attribute \"{}\" for row tag.", value);
+
                             return false;
                         }
 
