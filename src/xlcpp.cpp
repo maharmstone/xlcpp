@@ -1420,7 +1420,10 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                 else if (t_val == "s") { // shared string
                     shared_string ss;
 
-                    ss.num = stoi(v_val);
+                    auto [ptr, ec] = from_chars(v_val.data(), v_val.data() + v_val.length(), ss.num);
+
+                    if (ptr != v_val.data() + v_val.length())
+                        throw formatted_error("Invalid v attribute \"{}\" on shared-string cell.", v_val);
 
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
 
