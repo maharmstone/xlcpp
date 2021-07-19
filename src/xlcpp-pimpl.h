@@ -229,6 +229,7 @@ public:
     bool is_empty() const;
     void attributes_loop_raw(const std::function<bool(const std::string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
                                                       const xml_enc_string_view& value_raw)>& func) const;
+    std::optional<xml_enc_string_view> get_attribute(const std::string_view& name, const std::string_view& ns = "") const;
     xml_enc_string_view namespace_uri_raw() const;
     std::string_view name() const;
     std::string_view local_name() const;

@@ -970,6 +970,13 @@ workbook::workbook() {
     impl->date1904 = false;
 }
 
+static string try_decode(const optional<xml_enc_string_view>& sv) {
+    if (!sv)
+        return "";
+
+    return sv.value().decode();
+}
+
 static void parse_content_types(const string& ct, unordered_map<string, file>& files) {
     xml_reader r(ct);
     unsigned int depth = 0;
@@ -991,29 +998,13 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
                     throw formatted_error("Root tag name was not \"Types\".");
             } else if (depth == 1) {
                 if (r.local_name() == "Default" && !r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
-                    string ext, ct;
-
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value) {
-                        if (name == "Extension" && ns.empty())
-                            ext = value.decode();
-                        else if (name == "ContentType" && ns.empty())
-                            ct = value.decode();
-
-                        return true;
-                    });
+                    auto ext = try_decode(r.get_attribute("Extension"));
+                    auto ct = try_decode(r.get_attribute("ContentType"));
 
                     defs[ext] = ct;
                 } else if (r.local_name() == "Override" && r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
-                    string part, ct;
-
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value) {
-                        if (name == "PartName" && ns.empty())
-                            part = value.decode();
-                        else if (name == "ContentType" && ns.empty())
-                            ct = value.decode();
-
-                        return true;
-                    });
+                    auto part = try_decode(r.get_attribute("PartName"));
+                    auto ct = try_decode(r.get_attribute("ContentType"));
 
                     over[part] = ct;
                 }
@@ -1094,16 +1085,8 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
                     throw formatted_error("Root tag name was not \"Relationships\".");
             } else if (depth == 1) {
                 if (r.local_name() == "Relationship" && r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
-                    string id, target;
-
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value) {
-                        if (name == "Id" && ns.empty())
-                            id = value.decode();
-                        else if (name == "Target" && ns.empty())
-                            target = value.decode();
-
-                        return true;
-                    });
+                    auto id = try_decode(r.get_attribute("Id"));
+                    auto target = try_decode(r.get_attribute("Target"));
 
                     if (!id.empty() && !target.empty())
                         rels[id] = target;
@@ -1260,7 +1243,7 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
     bool in_sheet_data = false;
     unsigned int last_index = 0, last_col;
     row* row = nullptr;
-    string r_val, s_val, t_val, v_val, is_val;
+    string s_val, t_val, v_val, is_val;
     bool in_v = false, in_is = false;
 
     while (r.read()) {
@@ -1282,20 +1265,15 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
             else if (in_sheet_data) {
                 if (r.local_name() == "row" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                     unsigned int row_index = 0;
+                    auto rsv = r.get_attribute("r");
 
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value_raw) {
-                        if (name == "r" && ns.empty()) {
-                            auto value = value_raw.decode();
-                            auto [ptr, ec] = from_chars(value.data(), value.data() + value.length(), row_index);
+                    if (rsv) {
+                        auto value = rsv.value().decode();
+                        auto [ptr, ec] = from_chars(value.data(), value.data() + value.length(), row_index);
 
-                            if (ptr != value.data() + value.length())
-                                throw formatted_error("Invalid r attribute \"{}\" for row tag.", value);
-
-                            return false;
-                        }
-
-                        return true;
-                    });
+                        if (ptr != value.data() + value.length())
+                            throw formatted_error("Invalid r attribute \"{}\" for row tag.", value);
+                    }
 
                     if (row_index == 0)
                         throw formatted_error("No row index given.");
@@ -1316,21 +1294,13 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                     last_col = 0;
                 } else if (row && r.local_name() == "c" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                     unsigned int row_num, col_num;
+                    auto r_val = try_decode(r.get_attribute("r"));
 
-                    r_val = t_val = s_val = v_val = is_val = "";
+                    v_val = "";
+                    is_val = "";
 
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value) {
-                        if (ns.empty()) {
-                            if (name == "r")
-                                r_val = value.decode();
-                            else if (name == "t")
-                                t_val = value.decode();
-                            else if (name == "s")
-                                s_val = value.decode();
-                        }
-
-                        return true;
-                    });
+                    t_val = try_decode(r.get_attribute("t"));
+                    s_val = try_decode(r.get_attribute("s"));
 
                     if (r_val.empty())
                         throw formatted_error("Cell had no r value.");
@@ -1500,31 +1470,23 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
                     throw formatted_error("Root tag name was not \"workbook\".");
             } else if (depth == 1) {
                 if (r.local_name() == "workbookPr" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value_raw) {
-                        if (name == "date1904" && ns.empty()) {
-                            auto value = value_raw.decode();
+                    auto date1904sv = r.get_attribute("date1904");
 
-                            date1904 = value == "true" || value == "1";
-                        }
-
-                        return true;
-                    });
+                    if (date1904sv) {
+                        auto value = date1904sv.value().decode();
+                        date1904 = value == "true" || value == "1";
+                    }
                 }
             } else if (depth == 2) {
                 if (r.local_name() == "sheet" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
-                    string sheet_name, rid;
                     bool visible = true;
 
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value_raw) {
-                        if (name == "name" && ns.empty())
-                            sheet_name = value_raw.decode();
-                        else if (name == "id" && ns.cmp(NS_RELATIONSHIPS))
-                            rid = value_raw.decode();
-                        else if (name == "state" && ns.empty())
-                            visible = value_raw.decode() != "hidden";
+                    auto sheet_name = try_decode(r.get_attribute("name"));
+                    auto rid = try_decode(r.get_attribute("id", NS_RELATIONSHIPS));
 
-                        return true;
-                    });
+                    auto statesv = r.get_attribute("state");
+                    if (statesv)
+                        visible = statesv.value().decode() != "hidden";
 
                     if (!sheet_name.empty() && !rid.empty())
                         sheets_rels.emplace_back(rid, sheet_name, visible);
@@ -1644,43 +1606,39 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                     unsigned int id = 0;
                     string format_code;
 
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value_raw) {
-                        if (name == "numFmtId" && ns.empty()) {
-                            auto value = value_raw.decode();
-                            auto fcr = from_chars(value.data(), value.data() + value.length(), id);
+                    auto numfmtsv = r.get_attribute("numFmtId");
+                    if (numfmtsv) {
+                        auto value = numfmtsv.value().decode();
+                        auto fcr = from_chars(value.data(), value.data() + value.length(), id);
 
-                            if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
-                                throw formatted_error("Failed to parse numFmtId value {}.", value);
-                        } else if (name == "formatCode" && ns.empty())
-                            format_code = value_raw.decode();
+                        if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
+                            throw formatted_error("Failed to parse numFmtId value {}.", value);
 
-                        return true;
-                    });
-
-                    if (id != 0)
-                        number_formats[id] = format_code;
+                        if (id != 0)
+                            number_formats[id] = try_decode(r.get_attribute("formatCode"));
+                    }
                 } else if (in_cellxfs && r.local_name() == "xf" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                     optional<unsigned int> numfmtid;
                     bool apply_number_format = true;
 
-                    r.attributes_loop_raw([&](const string_view& name, const xml_enc_string_view& ns, const xml_enc_string_view& value_raw) {
-                        if (name == "numFmtId" && ns.empty()) {
-                            unsigned int num;
+                    auto numfmtsv = r.get_attribute("numFmtId");
+                    if (numfmtsv) {
+                        unsigned int num;
 
-                            auto value = value_raw.decode();
-                            auto fcr = from_chars(value.data(), value.data() + value.length(), num);
+                        auto value = numfmtsv.value().decode();
+                        auto fcr = from_chars(value.data(), value.data() + value.length(), num);
 
-                            if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
-                                throw formatted_error("Failed to parse numFmtId value {}.", value);
+                        if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
+                            throw formatted_error("Failed to parse numFmtId value {}.", value);
 
-                            numfmtid = num;
-                        } else if (name == "applyNumberFormat" && ns.empty()) {
-                            auto value = value_raw.decode();
-                            apply_number_format = value == "true" || value == "1";
-                        }
+                        numfmtid = num;
+                    }
 
-                        return true;
-                    });
+                    auto applysv = r.get_attribute("applyNumberFormat");
+                    if (applysv) {
+                        auto value = applysv.value().decode();
+                        apply_number_format = value == "true" || value == "1";
+                    }
 
                     if (!apply_number_format)
                         numfmtid = nullopt;

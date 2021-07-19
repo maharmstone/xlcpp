@@ -173,6 +173,25 @@ void xml_reader::attributes_loop_raw(const function<bool(const string_view& loca
     });
 }
 
+optional<xml_enc_string_view> xml_reader::get_attribute(const string_view& name, const string_view& ns) const {
+    if (type != xml_node::element)
+        return nullopt;
+
+    optional<xml_enc_string_view> xesv;
+
+    attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+                            const xml_enc_string_view& value_raw) {
+        if (local_name == name && namespace_uri_raw.cmp(ns)) {
+            xesv = value_raw;
+            return false;
+        }
+
+        return true;
+    });
+
+    return xesv;
+}
+
 xml_enc_string_view xml_reader::namespace_uri_raw() const {
     auto tag = name();
     auto colon = tag.find_first_of(':');
