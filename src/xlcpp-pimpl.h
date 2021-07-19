@@ -203,7 +203,23 @@ enum class xml_node {
     xml_declaration
 };
 
-using ns_list = std::vector<std::pair<std::string_view, std::string_view>>;
+class xml_enc_string_view {
+public:
+    xml_enc_string_view() { }
+    xml_enc_string_view(const std::string_view& sv) : sv(sv) { }
+
+    bool empty() const noexcept {
+        return sv.empty();
+    }
+
+    std::string decode() const;
+    bool cmp(const std::string_view& str) const;
+
+private:
+    std::string_view sv;
+};
+
+using ns_list = std::vector<std::pair<std::string_view, xml_enc_string_view>>;
 
 class xml_reader {
 public:
@@ -211,12 +227,12 @@ public:
     bool read();
     enum xml_node node_type() const;
     bool is_empty() const;
-    void attributes_loop_raw(const std::function<bool(const std::string_view& local_name, const std::string_view& namespace_uri_raw,
-                                                     const std::string_view& value_raw)>& func) const;
-    std::string_view namespace_uri_raw() const;
+    void attributes_loop_raw(const std::function<bool(const std::string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+                                                      const xml_enc_string_view& value_raw)>& func) const;
+    xml_enc_string_view namespace_uri_raw() const;
     std::string_view name() const;
     std::string_view local_name() const;
-    std::string_view value_raw() const;
+    xml_enc_string_view value_raw() const;
 
 private:
     std::string_view sv, node;
@@ -224,6 +240,3 @@ private:
     bool empty_tag;
     std::vector<ns_list> namespaces;
 };
-
-std::string xml_decode(const std::string_view& raw);
-bool xml_cmp(const std::string_view& raw, const std::string_view& str);

@@ -6,7 +6,7 @@ static bool __inline is_whitespace(char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-static void parse_attributes(const string_view& node, const function<bool(const string_view&, const string_view&)>& func) {
+static void parse_attributes(const string_view& node, const function<bool(const string_view&, const xml_enc_string_view&)>& func) {
     auto s = node.substr(1, node.length() - 2);
 
     if (!s.empty() && s.back() == '/') {
@@ -123,7 +123,7 @@ bool xml_reader::read() {
             type = xml_node::element;
             ns_list ns;
 
-            parse_attributes(node, [&](const string_view& name, const string_view& value) {
+            parse_attributes(node, [&](const string_view& name, const xml_enc_string_view& value) {
                 if (name.starts_with("xmlns:"))
                     ns.emplace_back(name.substr(6), value);
                 else if (name == "xmlns")
@@ -149,16 +149,16 @@ bool xml_reader::is_empty() const {
     return type == xml_node::element && empty_tag;
 }
 
-void xml_reader::attributes_loop_raw(const function<bool(const string_view& local_name, const string_view& namespace_uri_raw,
-                                                         const string_view& value_raw)>& func) const {
+void xml_reader::attributes_loop_raw(const function<bool(const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+                                                         const xml_enc_string_view& value_raw)>& func) const {
     if (type != xml_node::element)
         return;
 
-    parse_attributes(node, [&](const string_view& name, const string_view& value_raw) {
+    parse_attributes(node, [&](const string_view& name, const xml_enc_string_view& value_raw) {
         auto colon = name.find_first_of(':');
 
         if (colon == string::npos)
-            return func(name, "", value_raw);
+            return func(name, xml_enc_string_view{}, value_raw);
 
         auto prefix = name.substr(0, colon);
 
@@ -169,11 +169,11 @@ void xml_reader::attributes_loop_raw(const function<bool(const string_view& loca
             }
         }
 
-        return func(name.substr(colon + 1), "", value_raw);
+        return func(name.substr(colon + 1), xml_enc_string_view{}, value_raw);
     });
 }
 
-string_view xml_reader::namespace_uri_raw() const {
+xml_enc_string_view xml_reader::namespace_uri_raw() const {
     auto tag = name();
     auto colon = tag.find_first_of(':');
     string_view prefix;
@@ -188,7 +188,7 @@ string_view xml_reader::namespace_uri_raw() const {
         }
     }
 
-    return "";
+    return {};
 }
 
 string_view xml_reader::name() const {
@@ -222,31 +222,24 @@ string_view xml_reader::local_name() const {
         return tag.substr(pos + 1);
 }
 
-string_view xml_reader::value_raw() const {
+xml_enc_string_view xml_reader::value_raw() const {
     if (type != xml_node::text)
-        return "";
+        return {};
 
     return node;
 }
 
-string xml_decode(const string_view& raw) {
+string xml_enc_string_view::decode() const {
     // FIXME - lt, gt, amp, quot, numeric, hex
 
-    return string{raw};
+    return string{sv};
 }
 
-bool xml_cmp(const string_view& raw, const string_view& str) {
-    bool encoded = false;
-
-    for (auto c : raw) {
-        if (c == '&') {
-            encoded = true;
-            break;
-        }
+bool xml_enc_string_view::cmp(const string_view& str) const {
+    for (auto c : sv) {
+        if (c == '&')
+            return decode() == str;
     }
 
-    if (!encoded)
-        return raw == str;
-
-    return xml_decode(raw) == str;
+    return sv == str;
 }
