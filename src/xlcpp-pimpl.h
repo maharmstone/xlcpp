@@ -10,7 +10,6 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <libxml/xmlwriter.h>
-#include <libxml/xmlreader.h>
 
 namespace xlcpp {
 
@@ -196,22 +195,35 @@ private:
     xmlTextWriterPtr writer;
 };
 
+enum class xml_node {
+    text,
+    whitespace,
+    element,
+    end_element,
+    xml_declaration
+};
+
+using ns_list = std::vector<std::pair<std::string_view, std::string_view>>;
+
 class xml_reader {
 public:
-    xml_reader(const std::string_view& sv);
-    ~xml_reader();
+    xml_reader(const std::string_view& sv) : sv(sv) { }
     bool read();
-    int node_type() const;
-    std::string name() const;
-    bool has_attributes() const;
-    bool get_attribute(unsigned int i, std::string& name, std::string& ns, std::string& value);
+    enum xml_node node_type() const;
     bool is_empty() const;
-    void attributes_loop(const std::function<bool(const std::string&, const std::string&, const std::string&)>& func);
-    std::string namespace_uri() const;
-    std::string local_name() const;
-    std::string value() const;
+    void attributes_loop_raw(const std::function<bool(const std::string_view& local_name, const std::string_view& namespace_uri_raw,
+                                                     const std::string_view& value_raw)>& func) const;
+    std::string_view namespace_uri_raw() const;
+    std::string_view name() const;
+    std::string_view local_name() const;
+    std::string_view value_raw() const;
 
 private:
-    xmlParserInputBufferPtr buf;
-    xmlTextReaderPtr reader;
+    std::string_view sv, node;
+    enum xml_node type;
+    bool empty_tag;
+    std::vector<ns_list> namespaces;
 };
+
+std::string xml_decode(const std::string_view& raw);
+bool xml_cmp(const std::string_view& raw, const std::string_view& str);

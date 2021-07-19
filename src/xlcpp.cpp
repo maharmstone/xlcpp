@@ -978,39 +978,39 @@ static void parse_content_types(const string& ct, unordered_map<string, file>& f
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "Types" || r.namespace_uri() != NS_CONTENT_TYPES)
+                if (r.local_name() != "Types" || !xml_cmp(r.namespace_uri_raw(), NS_CONTENT_TYPES))
                     throw formatted_error("Root tag name was not \"Types\".");
             } else if (depth == 1) {
-                if (r.local_name() == "Default" && r.namespace_uri() == NS_CONTENT_TYPES) {
+                if (r.local_name() == "Default" && xml_cmp(r.namespace_uri_raw(), NS_CONTENT_TYPES)) {
                     string ext, ct;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value) {
                         if (name == "Extension" && ns.empty())
-                            ext = value;
+                            ext = xml_decode(value);
                         else if (name == "ContentType" && ns.empty())
-                            ct = value;
+                            ct = xml_decode(value);
 
                         return true;
                     });
 
                     defs[ext] = ct;
-                } else if (r.local_name() == "Override" && r.namespace_uri() == NS_CONTENT_TYPES) {
+                } else if (r.local_name() == "Override" && xml_cmp(r.namespace_uri_raw(), NS_CONTENT_TYPES)) {
                     string part, ct;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value) {
                         if (name == "PartName" && ns.empty())
-                            part = value;
+                            part = xml_decode(value);
                         else if (name == "ContentType" && ns.empty())
-                            ct = value;
+                            ct = xml_decode(value);
 
                         return true;
                     });
@@ -1081,26 +1081,26 @@ static unordered_map<string, string> read_relationships(const string& fn, const 
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "Relationships" || r.namespace_uri() != NS_PACKAGE_RELATIONSHIPS)
+                if (r.local_name() != "Relationships" || !xml_cmp(r.namespace_uri_raw(), NS_PACKAGE_RELATIONSHIPS))
                     throw formatted_error("Root tag name was not \"Relationships\".");
             } else if (depth == 1) {
-                if (r.local_name() == "Relationship" && r.namespace_uri() == NS_PACKAGE_RELATIONSHIPS) {
+                if (r.local_name() == "Relationship" && xml_cmp(r.namespace_uri_raw(), NS_PACKAGE_RELATIONSHIPS)) {
                     string id, target;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value) {
                         if (name == "Id" && ns.empty())
-                            id = value;
+                            id = xml_decode(value);
                         else if (name == "Target" && ns.empty())
-                            target = value;
+                            target = xml_decode(value);
 
                         return true;
                     });
@@ -1266,25 +1266,26 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "worksheet" || r.namespace_uri() != NS_SPREADSHEET)
+                if (r.local_name() != "worksheet" || !xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                     throw formatted_error("Root tag name was not \"worksheet\".");
-            } else if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+            } else if (depth == 1 && r.local_name() == "sheetData" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET) && !r.is_empty())
                 in_sheet_data = true;
             else if (in_sheet_data) {
-                if (r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET) {
+                if (r.local_name() == "row" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     unsigned int row_index = 0;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value_raw) {
                         if (name == "r" && ns.empty()) {
+                            auto value = xml_decode(value_raw);
                             auto [ptr, ec] = from_chars(value.data(), value.data() + value.length(), row_index);
 
                             if (ptr != value.data() + value.length())
@@ -1313,18 +1314,20 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                     last_index = row_index;
                     last_col = 0;
-                } else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+                } else if (row && r.local_name() == "c" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     unsigned int row_num, col_num;
 
                     r_val = t_val = s_val = v_val = is_val = "";
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
-                        if (name == "r" && ns.empty())
-                            r_val = value;
-                        else if (name == "t" && ns.empty())
-                            t_val = value;
-                        else if (name == "s" && ns.empty())
-                            s_val = value;
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value) {
+                        if (ns.empty()) {
+                            if (name == "r")
+                                r_val = xml_decode(value);
+                            else if (name == "t")
+                                t_val = xml_decode(value);
+                            else if (name == "s")
+                                s_val = xml_decode(value);
+                        }
 
                         return true;
                     });
@@ -1350,17 +1353,17 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                     if (r.is_empty())
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                } else if (row && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                } else if (row && r.local_name() == "v" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET) && !r.is_empty())
                     in_v = true;
-                else if (row && r.local_name() == "is" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                else if (row && r.local_name() == "is" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET) && !r.is_empty())
                     in_is = true;
             }
-        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
-            if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri() == NS_SPREADSHEET)
+        } else if (r.node_type() == xml_node::end_element) {
+            if (depth == 1 && r.local_name() == "sheetData" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 in_sheet_data = false;
-            else if (depth == 2 && r.local_name() == "row" && r.namespace_uri() == NS_SPREADSHEET)
+            else if (depth == 2 && r.local_name() == "row" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 row = nullptr;
-            else if (row && r.local_name() == "c" && r.namespace_uri() == NS_SPREADSHEET) {
+            else if (row && r.local_name() == "c" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                 cell* c;
                 string number_format;
 
@@ -1451,15 +1454,15 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
 
                 if (!s_val.empty())
                     c->impl->number_format = number_format;
-            } else if (in_v && r.local_name() == "v" && r.namespace_uri() == NS_SPREADSHEET)
+            } else if (in_v && r.local_name() == "v" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 in_v = false;
-            else if (in_is && r.local_name() == "is" && r.namespace_uri() == NS_SPREADSHEET)
+            else if (in_is && r.local_name() == "is" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 in_is = false;
-        } else if (r.node_type() == XML_READER_TYPE_TEXT) {
+        } else if (r.node_type() == xml_node::text) {
             if (in_v)
-                v_val += r.value();
+                v_val += xml_decode(r.value_raw());
             else if (in_is)
-                is_val += r.value();
+                is_val += xml_decode(r.value_raw());
         }
 
         depth = next_depth;
@@ -1484,38 +1487,41 @@ void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, c
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "workbook" || r.namespace_uri() != NS_SPREADSHEET)
+                if (r.local_name() != "workbook" || !xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                     throw formatted_error("Root tag name was not \"workbook\".");
             } else if (depth == 1) {
-                if (r.local_name() == "workbookPr" && r.namespace_uri() == NS_SPREADSHEET) {
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
-                        if (name == "date1904" && ns.empty())
+                if (r.local_name() == "workbookPr" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value_raw) {
+                        if (name == "date1904" && ns.empty()) {
+                            auto value = xml_decode(value_raw);
+
                             date1904 = value == "true" || value == "1";
+                        }
 
                         return true;
                     });
                 }
             } else if (depth == 2) {
-                if (r.local_name() == "sheet" && r.namespace_uri() == NS_SPREADSHEET) {
+                if (r.local_name() == "sheet" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     string sheet_name, rid;
                     bool visible = true;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value_raw) {
                         if (name == "name" && ns.empty())
-                            sheet_name = value;
-                        else if (name == "id" && ns == NS_RELATIONSHIPS)
-                            rid = value;
+                            sheet_name = xml_decode(value_raw);
+                        else if (name == "id" && xml_cmp(ns, NS_RELATIONSHIPS))
+                            rid = xml_decode(value_raw);
                         else if (name == "state" && ns.empty())
-                            visible = value != "hidden";
+                            visible = xml_decode(value_raw) != "hidden";
 
                         return true;
                     });
@@ -1569,28 +1575,28 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "sst" || r.namespace_uri() != NS_SPREADSHEET)
+                if (r.local_name() != "sst" || !xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                     throw formatted_error("Root tag name was not \"sst\".");
             } else if (depth == 1) {
-                if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
+                if (r.local_name() == "si" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     in_si = true;
                     si_val = "";
                 }
             }
-        } else if (r.node_type() == XML_READER_TYPE_TEXT) {
+        } else if (r.node_type() == xml_node::text) {
             if (in_si)
-                si_val += decode_escape_sequences(r.value());
-        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
-            if (r.local_name() == "si" && r.namespace_uri() == NS_SPREADSHEET) {
+                si_val += decode_escape_sequences(xml_decode(r.value_raw()));
+        } else if (r.node_type() == xml_node::end_element) {
+            if (r.local_name() == "si" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                 shared_strings2.emplace_back(si_val);
                 in_si = false;
             }
@@ -1617,57 +1623,61 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
     while (r.read()) {
         unsigned int next_depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT && !r.is_empty())
+        if (r.node_type() == xml_node::element && !r.is_empty())
             next_depth = depth + 1;
-        else if (r.node_type() == XML_READER_TYPE_END_ELEMENT)
+        else if (r.node_type() == xml_node::end_element)
             next_depth = depth - 1;
         else
             next_depth = depth;
 
-        if (r.node_type() == XML_READER_TYPE_ELEMENT) {
+        if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "styleSheet" || r.namespace_uri() != NS_SPREADSHEET)
+                if (r.local_name() != "styleSheet" || !xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                     throw formatted_error("Root tag name was not \"styleSheet\".");
             } else if (depth == 1) {
-                if (r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                if (r.local_name() == "numFmts" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET) && !r.is_empty())
                     in_numfmts = true;
-                else if (r.local_name() == "cellXfs" && r.namespace_uri() == NS_SPREADSHEET && !r.is_empty())
+                else if (r.local_name() == "cellXfs" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET) && !r.is_empty())
                     in_cellxfs = true;
             } else if (depth == 2) {
-                if (in_numfmts && r.local_name() == "numFmt" && r.namespace_uri() == NS_SPREADSHEET) {
+                if (in_numfmts && r.local_name() == "numFmt" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     unsigned int id = 0;
                     string format_code;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value_raw) {
                         if (name == "numFmtId" && ns.empty()) {
+                            auto value = xml_decode(value_raw);
                             auto fcr = from_chars(value.data(), value.data() + value.length(), id);
 
                             if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
                                 throw formatted_error("Failed to parse numFmtId value {}.", value);
                         } else if (name == "formatCode" && ns.empty())
-                            format_code = value;
+                            format_code = xml_decode(value_raw);
 
                         return true;
                     });
 
                     if (id != 0)
                         number_formats[id] = format_code;
-                } else if (in_cellxfs && r.local_name() == "xf" && r.namespace_uri() == NS_SPREADSHEET) {
+                } else if (in_cellxfs && r.local_name() == "xf" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET)) {
                     optional<unsigned int> numfmtid;
                     bool apply_number_format = true;
 
-                    r.attributes_loop([&](const string& name, const string& ns, const string& value) {
+                    r.attributes_loop_raw([&](const string_view& name, const string_view& ns, const string_view& value_raw) {
                         if (name == "numFmtId" && ns.empty()) {
                             unsigned int num;
 
+                            auto value = xml_decode(value_raw);
                             auto fcr = from_chars(value.data(), value.data() + value.length(), num);
 
                             if (fcr.ec != errc() || fcr.ptr != value.data() + value.length())
                                 throw formatted_error("Failed to parse numFmtId value {}.", value);
 
                             numfmtid = num;
-                        } else if (name == "applyNumberFormat" && ns.empty())
+                        } else if (name == "applyNumberFormat" && ns.empty()) {
+                            auto value = xml_decode(value_raw);
                             apply_number_format = value == "true" || value == "1";
+                        }
 
                         return true;
                     });
@@ -1678,10 +1688,10 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                     cell_styles.push_back(numfmtid);
                 }
             }
-        } else if (r.node_type() == XML_READER_TYPE_END_ELEMENT) {
-            if (in_numfmts && r.local_name() == "numFmts" && r.namespace_uri() == NS_SPREADSHEET)
+        } else if (r.node_type() == xml_node::end_element) {
+            if (in_numfmts && r.local_name() == "numFmts" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 in_numfmts = false;
-            else if (in_cellxfs && r.local_name() == "cellXfs" && r.namespace_uri() == NS_SPREADSHEET)
+            else if (in_cellxfs && r.local_name() == "cellXfs" && xml_cmp(r.namespace_uri_raw(), NS_SPREADSHEET))
                 in_cellxfs = false;
         }
 
