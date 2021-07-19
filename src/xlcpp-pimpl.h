@@ -200,7 +200,8 @@ enum class xml_node {
     whitespace,
     element,
     end_element,
-    xml_declaration
+    xml_declaration,
+    comment
 };
 
 class xml_enc_string_view {

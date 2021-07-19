@@ -79,7 +79,6 @@ bool xml_reader::read() {
         return false;
 
     // FIXME - CDATA
-    // FIXME - comments
 
     if (type == xml_node::element && empty_tag)
         namespaces.pop_back();
@@ -104,22 +103,54 @@ bool xml_reader::read() {
             }
         }
     } else {
-        auto pos = sv.find_first_of('>');
+        if (sv.starts_with("<?xml")) {
+            auto pos = sv.find_first_of("?>");
 
-        if (pos == string::npos) {
-            node = sv;
-            sv = "";
-        } else {
-            node = sv.substr(0, pos + 1);
-            sv = sv.substr(pos + 1);
-        }
+            if (pos == string::npos) {
+                node = sv;
+                sv = "";
+            } else {
+                node = sv.substr(0, pos + 1);
+                sv = sv.substr(pos + 1);
+            }
 
-        if (node.starts_with("<?xml"))
             type = xml_node::xml_declaration;
-        else if (node.starts_with("</")) {
+        } else if (sv.starts_with("</")) {
+            auto pos = sv.find_first_of('>');
+
+            if (pos == string::npos) {
+                node = sv;
+                sv = "";
+            } else {
+                node = sv.substr(0, pos + 1);
+                sv = sv.substr(pos + 1);
+            }
+
             type = xml_node::end_element;
             namespaces.pop_back();
+        } else if (sv.starts_with("<!--")) {
+            auto pos = sv.find_first_of("-->");
+
+            if (pos == string::npos) {
+                node = sv;
+                sv = "";
+            } else {
+                node = sv.substr(0, pos + 1);
+                sv = sv.substr(pos + 1);
+            }
+
+            type = xml_node::comment;
         } else {
+            auto pos = sv.find_first_of('>');
+
+            if (pos == string::npos) {
+                node = sv;
+                sv = "";
+            } else {
+                node = sv.substr(0, pos + 1);
+                sv = sv.substr(pos + 1);
+            }
+
             type = xml_node::element;
             ns_list ns;
 
