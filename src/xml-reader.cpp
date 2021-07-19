@@ -1,4 +1,5 @@
 #include "xlcpp-pimpl.h"
+#include <charconv>
 
 using namespace std;
 
@@ -279,10 +280,93 @@ xml_enc_string_view xml_reader::value_raw() const {
     return node;
 }
 
-string xml_enc_string_view::decode() const {
-    // FIXME - lt, gt, amp, quot, numeric, hex
+static string esc_char(const string_view& s) {
+    uint32_t c = 0;
+    from_chars_result fcr;
 
-    return string{sv};
+    if (s.starts_with("x"))
+        fcr = from_chars(s.data() + 1, s.data() + s.length(), c, 16);
+    else
+        fcr = from_chars(s.data(), s.data() + s.length(), c);
+
+    if (c == 0 || c > 0x10ffff)
+        return "";
+
+    if (c < 0x80)
+        return string{(char)c, 1};
+    else if (c < 0x800) {
+        char t[2];
+
+        t[0] = 0xc0 | (c >> 6);
+        t[1] = 0x80 | (c & 0x3f);
+
+        return string{string_view(t, 2)};
+    } else if (c < 0x10000) {
+        char t[3];
+
+        t[0] = 0xe0 | (c >> 12);
+        t[1] = 0x80 | ((c >> 6) & 0x3f);
+        t[2] = 0x80 | (c & 0x3f);
+
+        return string{string_view(t, 3)};
+    } else {
+        char t[4];
+
+        t[0] = 0xf0 | (c >> 18);
+        t[1] = 0x80 | ((c >> 12) & 0x3f);
+        t[2] = 0x80 | ((c >> 6) & 0x3f);
+        t[3] = 0x80 | (c & 0x3f);
+
+        return string{string_view(t, 4)};
+    }
+}
+
+string xml_enc_string_view::decode() const {
+    auto v = sv;
+    string s;
+
+    s.reserve(v.length());
+
+    while (!v.empty()) {
+        if (v.front() == '&') {
+            v.remove_prefix(1);
+
+            if (v.starts_with("amp;")) {
+                s += "&";
+                v.remove_prefix(4);
+            } else if (v.starts_with("lt;")) {
+                s += "<";
+                v.remove_prefix(3);
+            } else if (v.starts_with("gt;")) {
+                s += ">";
+                v.remove_prefix(3);
+            } else if (v.starts_with("quot;")) {
+                s += "\"";
+                v.remove_prefix(5);
+            } else if (v.starts_with("#")) {
+                string_view bit;
+
+                v.remove_prefix(1);
+
+                auto sc = v.find_first_of(';');
+                if (sc == string::npos) {
+                    bit = v;
+                    v = "";
+                } else {
+                    bit = v.substr(0, sc);
+                    v.remove_prefix(sc + 1);
+                }
+
+                s += esc_char(bit);
+            } else
+                s += "&";
+        } else {
+            s += v.front();
+            v.remove_prefix(1);
+        }
+    }
+
+    return s;
 }
 
 bool xml_enc_string_view::cmp(const string_view& str) const {
