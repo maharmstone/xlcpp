@@ -132,13 +132,11 @@ bool xml_reader::read() {
         } else if (sv.starts_with("<!--")) {
             auto pos = sv.find("-->");
 
-            if (pos == string::npos) {
-                node = sv;
-                sv = "";
-            } else {
-                node = sv.substr(0, pos + 1);
-                sv = sv.substr(pos + 1);
-            }
+            if (pos == string::npos)
+                throw runtime_error("Malformed comment.");
+
+            node = sv.substr(0, pos + 3);
+            sv = sv.substr(pos + 3);
 
             type = xml_node::comment;
         } else if (sv.starts_with("<![CDATA[")) {
