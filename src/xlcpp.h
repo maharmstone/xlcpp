@@ -139,8 +139,10 @@ public:
         return add_cell(std::string_view(val));
     }
 
-    cell& add_cell(int val) {
-        return add_cell((int64_t)val);
+    template<typename T>
+    requires std::is_integral_v<T>
+    cell& add_cell(T val) {
+        return add_cell(static_cast<int64_t>(val));
     }
 
     template<typename T>
