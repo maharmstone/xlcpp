@@ -357,6 +357,9 @@ string xml_enc_string_view::decode() const {
             } else if (v.starts_with("quot;")) {
                 s += "\"";
                 v.remove_prefix(5);
+            } else if (v.starts_with("apos;")) {
+                s += "'";
+                v.remove_prefix(5);
             } else if (v.starts_with("#")) {
                 string_view bit;
 
