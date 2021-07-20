@@ -949,7 +949,7 @@ void cell_pimpl::set_font(const string_view& name, unsigned int size, bool bold)
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_font(const string& name, unsigned int size, bool bold) {
+void cell::set_font(const string_view& name, unsigned int size, bool bold) {
     impl->set_font(name, size, bold);
 }
 
@@ -961,7 +961,7 @@ void cell_pimpl::set_number_format(const string_view& fmt) {
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_number_format(const string& fmt) {
+void cell::set_number_format(const string_view& fmt) {
     impl->set_number_format(fmt);
 }
 

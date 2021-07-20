@@ -106,8 +106,8 @@ public:
     template<typename T>
     cell(row_pimpl& r, unsigned int num, T* t) = delete;
 
-    void set_number_format(const std::string& fmt);
-    void set_font(const std::string& name, unsigned int size, bool bold = false);
+    void set_number_format(const std::string_view& fmt);
+    void set_font(const std::string_view& name, unsigned int size, bool bold = false);
     std::string get_number_format() const;
     cell_t value() const;
 
