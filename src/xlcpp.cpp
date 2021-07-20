@@ -1235,7 +1235,7 @@ static string decode_escape_sequences(const string_view& sv) {
     return s;
 }
 
-void workbook_pimpl::load_sheet(const string_view& name, const string& data, bool visible) {
+void workbook_pimpl::load_sheet(const string_view& name, const string_view& data, bool visible) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
     xml_reader r(data);
