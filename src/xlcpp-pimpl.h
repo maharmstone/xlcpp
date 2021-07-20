@@ -45,8 +45,8 @@ bool operator==(const font& lhs, const font& rhs) noexcept;
 
 class style {
 public:
-    style(const std::string& number_format, const std::string& font, unsigned int font_size, bool bold = false) :
-    number_format(number_format), font(font, font_size, bold) { }
+    style(const std::string_view& number_format, const std::string_view& font, unsigned int font_size, bool bold = false) :
+        number_format(number_format), font(font, font_size, bold) { }
 
     void set_font(const std::string& font_name, unsigned int font_size, bool bold);
     void set_number_format(const std::string& fmt);
