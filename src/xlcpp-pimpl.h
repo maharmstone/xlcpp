@@ -183,10 +183,10 @@ class xml_writer {
 public:
     std::string dump() const;
     void start_document();
-    void start_element(const std::string& tag, const std::unordered_map<std::string, std::string>& namespaces = {});
+    void start_element(const std::string_view& tag, const std::unordered_map<std::string, std::string>& namespaces = {});
     void end_element();
-    void text(const std::string& s);
-    void attribute(const std::string& name, const std::string& value);
+    void text(const std::string_view& s);
+    void attribute(const std::string_view& name, const std::string_view& value);
 
 private:
     std::string buf;
