@@ -79,7 +79,6 @@ bool xml_reader::read() {
     if (sv.empty())
         return false;
 
-    // FIXME - processing instructions (<?xml-stylesheet type="text/xsl" href="style.xsl"?>)
     // FIXME - DOCTYPE (<!DOCTYPE greeting SYSTEM "hello.dtd">, <!DOCTYPE greeting [ <!ELEMENT greeting (#PCDATA)> ]>)
 
     if (type == xml_node::element && empty_tag)
@@ -105,18 +104,18 @@ bool xml_reader::read() {
             }
         }
     } else {
-        if (sv.starts_with("<?xml")) {
+        if (sv.starts_with("<?")) {
             auto pos = sv.find("?>");
 
             if (pos == string::npos) {
                 node = sv;
                 sv = "";
             } else {
-                node = sv.substr(0, pos + 1);
-                sv = sv.substr(pos + 1);
+                node = sv.substr(0, pos + 2);
+                sv = sv.substr(pos + 2);
             }
 
-            type = xml_node::xml_declaration;
+            type = xml_node::processing_instruction;
         } else if (sv.starts_with("</")) {
             auto pos = sv.find_first_of('>');
 

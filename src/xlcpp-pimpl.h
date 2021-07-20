@@ -200,7 +200,7 @@ enum class xml_node {
     whitespace,
     element,
     end_element,
-    xml_declaration,
+    processing_instruction,
     comment,
     cdata
 };
