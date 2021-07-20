@@ -76,7 +76,7 @@ public:
     workbook_pimpl(HANDLE h);
     ~workbook_pimpl();
 #endif
-    sheet& add_sheet(const std::string& name, bool visible);
+    sheet& add_sheet(const std::string_view& name, bool visible);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
 
@@ -91,7 +91,7 @@ public:
     la_ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
     void parse_workbook(const std::string& fn, const std::string_view& data,
                         const std::unordered_map<std::string, file>& files);
-    void load_sheet(const std::string& name, const std::string& data, bool visible);
+    void load_sheet(const std::string_view& name, const std::string& data, bool visible);
     void load_shared_strings2(const std::string_view& sv);
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
     void load_styles(const std::unordered_map<std::string, file>& files);
@@ -131,7 +131,7 @@ public:
 
 class sheet_pimpl {
 public:
-    sheet_pimpl(workbook_pimpl& wb, const std::string& name, unsigned int num, bool visible) : parent(wb), name(name), num(num), visible(visible) { }
+    sheet_pimpl(workbook_pimpl& wb, const std::string_view& name, unsigned int num, bool visible) : parent(wb), name(name), num(num), visible(visible) { }
 
     void write(struct archive* a) const;
     std::string xml() const;

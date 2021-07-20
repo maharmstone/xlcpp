@@ -59,7 +59,7 @@ class row;
 
 class XLCPP sheet {
 public:
-    sheet(workbook_pimpl& wb, const std::string& name, unsigned int num, bool visible = true);
+    sheet(workbook_pimpl& wb, const std::string_view& name, unsigned int num, bool visible = true);
     ~sheet();
     row& add_row();
     std::string name() const;

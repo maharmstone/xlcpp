@@ -58,7 +58,7 @@ static const array builtin_styles = {
 
 namespace xlcpp {
 
-sheet& workbook_pimpl::add_sheet(const string& name, bool visible) {
+sheet& workbook_pimpl::add_sheet(const string_view& name, bool visible) {
     return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 }
 
@@ -1235,7 +1235,7 @@ static string decode_escape_sequences(const string_view& sv) {
     return s;
 }
 
-void workbook_pimpl::load_sheet(const string& name, const string& data, bool visible) {
+void workbook_pimpl::load_sheet(const string_view& name, const string& data, bool visible) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
     xml_reader r(data);
@@ -1911,7 +1911,7 @@ workbook::~workbook() {
     delete impl;
 }
 
-sheet::sheet(workbook_pimpl& wb, const string& name, unsigned int num, bool visible) {
+sheet::sheet(workbook_pimpl& wb, const string_view& name, unsigned int num, bool visible) {
     impl = new sheet_pimpl(wb, name, num, visible);
 }
 
