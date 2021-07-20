@@ -857,11 +857,11 @@ row& sheet::add_row() {
     return impl->add_row();
 }
 
-shared_string workbook_pimpl::get_shared_string(const string& s) {
+shared_string workbook_pimpl::get_shared_string(const string_view& s) {
     shared_string ss;
 
-    if (shared_strings.count(s) != 0)
-        return shared_strings.at(s);
+    if (shared_strings.contains(s))
+        return shared_strings.find(s)->second;
 
     ss.num = shared_strings.size();
 
@@ -883,14 +883,14 @@ cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), 
 }
 
 template<>
-cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const string& t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
+cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const string_view& t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
 }
 
 cell::cell(row_pimpl& r, unsigned int num, int64_t val) {
     impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const string& val) {
+cell::cell(row_pimpl& r, unsigned int num, const string_view& val) {
     impl = new cell_pimpl(r, num, val);
 }
 
@@ -1931,7 +1931,7 @@ cell& row::add_cell(int64_t val) {
     return impl->add_cell(val);
 }
 
-cell& row::add_cell(const string& val) {
+cell& row::add_cell(const string_view& val) {
     return impl->add_cell(val);
 }
 

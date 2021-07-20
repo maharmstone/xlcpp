@@ -3,6 +3,7 @@
 #include "xlcpp.h"
 #include <list>
 #include <variant>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
@@ -83,7 +84,7 @@ public:
     void write_content_types_xml(struct archive* a) const;
     void write_rels(struct archive* a) const;
     void write_workbook_rels(struct archive* a) const;
-    shared_string get_shared_string(const std::string& s);
+    shared_string get_shared_string(const std::string_view& s);
     void write_shared_strings(struct archive* a) const;
     void write_styles(struct archive* a) const;
     void write_archive(struct archive* a) const;
@@ -112,7 +113,7 @@ public:
     }
 
     std::list<sheet> sheets;
-    std::unordered_map<std::string, shared_string> shared_strings;
+    std::map<std::string, shared_string, std::less<>> shared_strings;
     std::vector<std::string> shared_strings2;
     std::unordered_set<style, style_hash> styles;
     std::unordered_map<unsigned int, std::string> number_formats;
