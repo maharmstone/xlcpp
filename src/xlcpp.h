@@ -132,11 +132,11 @@ public:
     cell& add_cell(std::nullptr_t);
 
     cell& add_cell(const char* val) {
-        return add_cell(std::string(val));
+        return add_cell(std::string_view(val));
     }
 
     cell& add_cell(char* val) {
-        return add_cell(std::string(val));
+        return add_cell(std::string_view(val));
     }
 
     cell& add_cell(int val) {
