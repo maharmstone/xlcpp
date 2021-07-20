@@ -297,28 +297,28 @@ string sheet_pimpl::xml() const {
                     writer.attribute("t", "n"); // number
 
                     writer.start_element("v");
-                    writer.text(to_string(get<int64_t>(c.impl->val)));
+                    writer.text(to_string(arg));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, shared_string>) {
                     writer.attribute("t", "s"); // shared string
 
                     writer.start_element("v");
-                    writer.text(to_string(get<shared_string>(c.impl->val).num));
+                    writer.text(to_string(arg.num));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, double>) {
                     writer.attribute("t", "n"); // number
 
                     writer.start_element("v");
-                    writer.text(to_string(get<double>(c.impl->val)));
+                    writer.text(to_string(arg));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, chrono::year_month_day>) {
                     writer.attribute("t", "n"); // number
 
                     writer.start_element("v");
-                    writer.text(to_string(date_to_number(get<chrono::year_month_day>(c.impl->val), parent.date1904)));
+                    writer.text(to_string(date_to_number(arg, parent.date1904)));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, chrono::seconds>) {
-                    auto s = (double)get<chrono::seconds>(c.impl->val).count() / 86400.0;
+                    auto s = (double)arg.count() / 86400.0;
 
                     writer.attribute("t", "n"); // number
 
@@ -329,13 +329,13 @@ string sheet_pimpl::xml() const {
                     writer.attribute("t", "n"); // number
 
                     writer.start_element("v");
-                    writer.text(to_string(datetime_to_number(get<datetime>(c.impl->val), parent.date1904)));
+                    writer.text(to_string(datetime_to_number(arg, parent.date1904)));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, bool>) {
                     writer.attribute("t", "b"); // bool
 
                     writer.start_element("v");
-                    writer.text(to_string(get<bool>(c.impl->val)));
+                    writer.text(to_string(arg));
                     writer.end_element();
                 } else if constexpr (is_same_v<T, nullptr_t>) {
                     // nop
@@ -343,7 +343,7 @@ string sheet_pimpl::xml() const {
                     writer.attribute("t", "str");
 
                     writer.start_element("v");
-                    writer.text(get<string>(c.impl->val)); // FIXME - Unicode should be encoded
+                    writer.text(arg); // FIXME - Unicode should be encoded
                     writer.end_element();
                 } else
                     static_assert(always_false_v<T>);
