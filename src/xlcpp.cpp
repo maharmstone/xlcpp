@@ -62,7 +62,7 @@ sheet& workbook_pimpl::add_sheet(const string_view& name, bool visible) {
     return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 }
 
-sheet& workbook::add_sheet(const string& name, bool visible) {
+sheet& workbook::add_sheet(const string_view& name, bool visible) {
     return impl->add_sheet(name, visible);
 }
 

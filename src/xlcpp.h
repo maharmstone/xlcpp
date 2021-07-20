@@ -43,7 +43,7 @@ public:
     workbook(HANDLE h);
 #endif
     ~workbook();
-    sheet& add_sheet(const std::string& name, bool visible = true);
+    sheet& add_sheet(const std::string_view& name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
     const std::list<sheet>& sheets() const;
