@@ -35,7 +35,7 @@ static const array builtin_styles = {
     pair{ 10, "0.00%" },
     pair{ 11, "0.00E+00" },
     pair{ 12, "# ?/?" },
-    pair{ 13, "# ??/??" },
+    pair{ 13, "# \?\?/??" },
     pair{ 14, "mm-dd-yy" },
     pair{ 15, "d-mmm-yy" },
     pair{ 16, "d-mmm" },
