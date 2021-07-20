@@ -1382,9 +1382,16 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
                             }
                         }
 
-                        if (is_int)
-                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)stoll(v_val));
-                        else
+                        if (is_int) {
+                            int64_t val;
+
+                            auto [ptr, ec] = from_chars(v_val.data(), v_val.data() + v_val.length(), val);
+
+                            if (ptr != v_val.data() + v_val.length())
+                                throw formatted_error("Could not convert {} to int64_t.", v_val);
+
+                            c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, val);
+                        } else
                             c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, stod(v_val));
                     }
                 } else if (t_val == "b") // boolean
