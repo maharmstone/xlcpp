@@ -261,6 +261,9 @@ static constexpr double datetime_to_number(const datetime& dt, bool date1904) no
     return (double)date_to_number(dt.d, date1904) + ((double)dt.t.count() / 86400.0);
 }
 
+template<typename>
+inline constexpr bool always_false_v = false;
+
 string sheet_pimpl::xml() const {
     xml_writer writer;
 
@@ -287,54 +290,64 @@ string sheet_pimpl::xml() const {
             writer.attribute("r", make_reference(r.impl->num, c.impl->num));
             writer.attribute("s", to_string(c.impl->sty->num));
 
-            if (holds_alternative<int64_t>(c.impl->val)) {
-                writer.attribute("t", "n"); // number
+            visit([&](auto&& arg) {
+                using T = decay_t<decltype(arg)>;
 
-                writer.start_element("v");
-                writer.text(to_string(get<int64_t>(c.impl->val)));
-                writer.end_element();
-            } else if (holds_alternative<shared_string>(c.impl->val)) {
-                writer.attribute("t", "s"); // shared string
+                if constexpr (is_same_v<T, int64_t>) {
+                    writer.attribute("t", "n"); // number
 
-                writer.start_element("v");
-                writer.text(to_string(get<shared_string>(c.impl->val).num));
-                writer.end_element();
-            } else if (holds_alternative<double>(c.impl->val)) {
-                writer.attribute("t", "n"); // number
+                    writer.start_element("v");
+                    writer.text(to_string(get<int64_t>(c.impl->val)));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, shared_string>) {
+                    writer.attribute("t", "s"); // shared string
 
-                writer.start_element("v");
-                writer.text(to_string(get<double>(c.impl->val)));
-                writer.end_element();
-            } else if (holds_alternative<chrono::year_month_day>(c.impl->val)) {
-                writer.attribute("t", "n"); // number
+                    writer.start_element("v");
+                    writer.text(to_string(get<shared_string>(c.impl->val).num));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, double>) {
+                    writer.attribute("t", "n"); // number
 
-                writer.start_element("v");
-                writer.text(to_string(date_to_number(get<chrono::year_month_day>(c.impl->val), parent.date1904)));
-                writer.end_element();
-            } else if (holds_alternative<chrono::seconds>(c.impl->val)) {
-                auto s = (double)get<chrono::seconds>(c.impl->val).count() / 86400.0;
+                    writer.start_element("v");
+                    writer.text(to_string(get<double>(c.impl->val)));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, chrono::year_month_day>) {
+                    writer.attribute("t", "n"); // number
 
-                writer.attribute("t", "n"); // number
+                    writer.start_element("v");
+                    writer.text(to_string(date_to_number(get<chrono::year_month_day>(c.impl->val), parent.date1904)));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, chrono::seconds>) {
+                    auto s = (double)get<chrono::seconds>(c.impl->val).count() / 86400.0;
 
-                writer.start_element("v");
-                writer.text(to_string(s));
-                writer.end_element();
-            } else if (holds_alternative<datetime>(c.impl->val)) {
-                writer.attribute("t", "n"); // number
+                    writer.attribute("t", "n"); // number
 
-                writer.start_element("v");
-                writer.text(to_string(datetime_to_number(get<datetime>(c.impl->val), parent.date1904)));
-                writer.end_element();
-            } else if (holds_alternative<bool>(c.impl->val)) {
-                writer.attribute("t", "b"); // bool
+                    writer.start_element("v");
+                    writer.text(to_string(s));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, datetime>) {
+                    writer.attribute("t", "n"); // number
 
-                writer.start_element("v");
-                writer.text(to_string(get<bool>(c.impl->val)));
-                writer.end_element();
-            } else if (holds_alternative<nullptr_t>(c.impl->val)) {
-                // nop
-            } else
-                throw formatted_error("Unknown type for cell.");
+                    writer.start_element("v");
+                    writer.text(to_string(datetime_to_number(get<datetime>(c.impl->val), parent.date1904)));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, bool>) {
+                    writer.attribute("t", "b"); // bool
+
+                    writer.start_element("v");
+                    writer.text(to_string(get<bool>(c.impl->val)));
+                    writer.end_element();
+                } else if constexpr (is_same_v<T, nullptr_t>) {
+                    // nop
+                } else if constexpr (is_same_v<T, string>) {
+                    writer.attribute("t", "str");
+
+                    writer.start_element("v");
+                    writer.text(get<string>(c.impl->val)); // FIXME - Unicode should be encoded
+                    writer.end_element();
+                } else
+                    static_assert(always_false_v<T>);
+            }, c.impl->val);
 
             writer.end_element();
         }
