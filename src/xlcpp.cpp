@@ -933,7 +933,7 @@ bool operator==(const style& lhs, const style& rhs) noexcept {
         lhs.font == rhs.font;
 }
 
-void style::set_font(const string& font_name, unsigned int font_size, bool bold) {
+void style::set_font(const string_view& font_name, unsigned int font_size, bool bold) {
     this->font = xlcpp::font(font_name, font_size, bold);
 }
 
@@ -941,7 +941,7 @@ void style::set_number_format(const string& fmt) {
     number_format = fmt;
 }
 
-void cell_pimpl::set_font(const string& name, unsigned int size, bool bold) {
+void cell_pimpl::set_font(const string_view& name, unsigned int size, bool bold) {
     auto sty2 = *sty;
 
     sty2.set_font(name, size, bold);
