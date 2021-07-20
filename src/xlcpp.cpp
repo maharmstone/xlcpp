@@ -1048,7 +1048,7 @@ static const pair<const string, file>& find_workbook(const unordered_map<string,
     throw formatted_error("Could not find workbook XML file.");
 }
 
-static unordered_map<string, string> read_relationships(const string& fn, const unordered_map<string, file>& files) {
+static unordered_map<string, string> read_relationships(const string_view& fn, const unordered_map<string, file>& files) {
     filesystem::path p = fn;
     unordered_map<string, string> rels;
 
@@ -1439,7 +1439,7 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
     }
 }
 
-void workbook_pimpl::parse_workbook(const string& fn, const string_view& data, const unordered_map<string, file>& files) {
+void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& data, const unordered_map<string, file>& files) {
     xml_reader r(data);
     unsigned int depth = 0;
 

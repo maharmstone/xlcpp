@@ -89,7 +89,7 @@ public:
     void write_styles(struct archive* a) const;
     void write_archive(struct archive* a) const;
     la_ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
-    void parse_workbook(const std::string& fn, const std::string_view& data,
+    void parse_workbook(const std::string_view& fn, const std::string_view& data,
                         const std::unordered_map<std::string, file>& files);
     void load_sheet(const std::string_view& name, const std::string_view& data, bool visible);
     void load_shared_strings2(const std::string_view& sv);
