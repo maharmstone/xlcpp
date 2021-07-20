@@ -937,7 +937,7 @@ void style::set_font(const string_view& font_name, unsigned int font_size, bool 
     this->font = xlcpp::font(font_name, font_size, bold);
 }
 
-void style::set_number_format(const string& fmt) {
+void style::set_number_format(const string_view& fmt) {
     number_format = fmt;
 }
 
@@ -953,7 +953,7 @@ void cell::set_font(const string& name, unsigned int size, bool bold) {
     impl->set_font(name, size, bold);
 }
 
-void cell_pimpl::set_number_format(const string& fmt) {
+void cell_pimpl::set_number_format(const string_view& fmt) {
     auto sty2 = *sty;
 
     sty2.set_number_format(fmt);

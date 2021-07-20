@@ -49,7 +49,7 @@ public:
         number_format(number_format), font(font, font_size, bold) { }
 
     void set_font(const std::string_view& font_name, unsigned int font_size, bool bold);
-    void set_number_format(const std::string& fmt);
+    void set_number_format(const std::string_view& fmt);
 
     std::string number_format;
     xlcpp::font font;
@@ -165,7 +165,7 @@ public:
 
     cell_pimpl(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell_pimpl(r, num, datetime{val}) { }
 
-    void set_number_format(const std::string& fmt);
+    void set_number_format(const std::string_view& fmt);
     void set_font(const std::string_view& name, unsigned int size, bool bold = false);
 
     row_pimpl& parent;
