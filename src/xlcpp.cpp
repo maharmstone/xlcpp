@@ -976,7 +976,7 @@ static string try_decode(const optional<xml_enc_string_view>& sv) {
     return sv.value().decode();
 }
 
-static void parse_content_types(const string& ct, unordered_map<string, file>& files) {
+static void parse_content_types(const string_view& ct, unordered_map<string, file>& files) {
     xml_reader r(ct);
     unsigned int depth = 0;
     unordered_map<string, string> defs, over;
