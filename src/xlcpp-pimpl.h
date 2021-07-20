@@ -25,7 +25,7 @@ typedef struct {
 
 class font {
 public:
-    font(const std::string& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
+    font(const std::string_view& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
 
     std::string font_name;
     unsigned int font_size;
