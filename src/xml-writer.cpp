@@ -2,69 +2,76 @@
 
 using namespace std;
 
-xml_writer::xml_writer() {
-    xmlInitParser();
-
-    buf = xmlBufferCreate();
-    if (!buf)
-        throw runtime_error("xmlBufferCreate failed");
-
-    writer = xmlNewTextWriterMemory(buf, 0);
-    if (!writer) {
-        xmlBufferFree(buf);
-        throw runtime_error("xmlNewTextWriterMemory failed");
-    }
-}
-
-xml_writer::~xml_writer() {
-    xmlFreeTextWriter(writer);
-    xmlBufferFree(buf);
-}
-
 string xml_writer::dump() const {
-    return (char*)buf->content;
+    return buf;
 }
 
 void xml_writer::start_document() {
-    int rc = xmlTextWriterStartDocument(writer, nullptr, "UTF-8", nullptr);
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterStartDocument failed (error " + to_string(rc) + ")");
+    buf += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    empty_tag = false;
 }
 
-void xml_writer::end_document() {
-    int rc = xmlTextWriterEndDocument(writer);
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterEndDocument failed (error " + to_string(rc) + ")");
+static string xml_escape(const string_view& s, bool att) {
+    string ret;
+
+    ret.reserve(s.length());
+
+    for (auto c : s) {
+        if (c == '<')
+            ret += "&lt;";
+        else if (c == '>')
+            ret += "&gt;";
+        else if (c == '&')
+            ret += "&amp;";
+        else if (c == '"' && att)
+            ret += "&quot;";
+        else
+            ret += c;
+    }
+
+    return ret;
 }
 
 void xml_writer::start_element(const string& tag, const unordered_map<string, string>& namespaces) {
-    int rc = xmlTextWriterStartElement(writer, BAD_CAST tag.c_str());
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterStartElement failed (error " + to_string(rc) + ")");
+    if (empty_tag)
+        buf += ">";
+
+    buf += "<" + tag;
+    tags.push(tag);
+
+    empty_tag = true;
 
     for (const auto& ns : namespaces) {
-        string att = ns.first.empty() ? "xmlns" : ("xmlns:" + ns.first);
+        buf += " xmlns";
 
-        rc = xmlTextWriterWriteAttribute(writer, BAD_CAST att.c_str(), BAD_CAST ns.second.c_str());
-        if (rc < 0)
-            throw runtime_error("xmlTextWriterWriteAttribute failed (error " + to_string(rc) + ")");
+        if (!ns.first.empty())
+            buf += ":" + ns.first;
+
+        buf += "=\"";
+        buf += xml_escape(ns.second, true);
+        buf += "\"";
     }
 }
 
 void xml_writer::end_element() {
-    int rc = xmlTextWriterEndElement(writer);
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterEndElement failed (error " + to_string(rc) + ")");
+    if (empty_tag) {
+        buf += "/>";
+        empty_tag = false;
+    } else
+        buf += "</" + tags.top() + ">";
+
+    tags.pop();
 }
 
 void xml_writer::text(const string& s) {
-    int rc = xmlTextWriterWriteString(writer, BAD_CAST s.c_str());
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterWriteString failed (error " + to_string(rc) + ")");
+    if (empty_tag) {
+        buf += ">";
+        empty_tag = false;
+    }
+
+    buf += xml_escape(s, false);
 }
 
 void xml_writer::attribute(const string& name, const string& value) {
-    int rc = xmlTextWriterWriteAttribute(writer, BAD_CAST name.c_str(), BAD_CAST value.c_str());
-    if (rc < 0)
-        throw runtime_error("xmlTextWriterWriteAttribute failed (error " + to_string(rc) + ")");
+    buf += " " + name + "=\"" + xml_escape(value, true) + "\"";
 }

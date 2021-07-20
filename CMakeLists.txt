@@ -12,7 +12,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-find_package(LibXml2 REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(fmt REQUIRED)
 
@@ -23,7 +22,6 @@ set(SRC_FILES src/xlcpp.cpp
     src/xml-reader.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
-target_link_libraries(xlcpp ${LIBXML2_LIBRARIES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
 target_link_libraries(xlcpp fmt::fmt)
 
@@ -38,7 +36,6 @@ if(WIN32)
 endif()
 
 target_include_directories(xlcpp PUBLIC "${LibArchive_INCLUDE_DIR}")
-target_include_directories(xlcpp PUBLIC "${LIBXML2_INCLUDE_DIR}")
 
 set_target_properties(xlcpp PROPERTIES PUBLIC_HEADER src/xlcpp.h)
 
@@ -54,7 +51,6 @@ install(TARGETS xlcpp
 if(BUILD_STATIC)
     add_library(xlcppstatic STATIC ${SRC_FILES})
     target_include_directories(xlcppstatic PUBLIC "${LibArchive_INCLUDE_DIR}")
-    target_include_directories(xlcppstatic PUBLIC "${LIBXML2_INCLUDE_DIR}")
     install(TARGETS xlcppstatic DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 endif()
 

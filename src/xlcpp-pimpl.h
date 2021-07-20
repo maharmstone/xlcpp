@@ -8,9 +8,9 @@
 #include <unordered_set>
 #include <functional>
 #include <optional>
+#include <stack>
 #include <archive.h>
 #include <archive_entry.h>
-#include <libxml/xmlwriter.h>
 
 namespace xlcpp {
 
@@ -181,19 +181,17 @@ public:
 
 class xml_writer {
 public:
-    xml_writer();
-    ~xml_writer();
     std::string dump() const;
     void start_document();
-    void end_document();
     void start_element(const std::string& tag, const std::unordered_map<std::string, std::string>& namespaces = {});
     void end_element();
     void text(const std::string& s);
     void attribute(const std::string& name, const std::string& value);
 
 private:
-    xmlBufferPtr buf;
-    xmlTextWriterPtr writer;
+    std::string buf;
+    std::stack<std::string> tags;
+    bool empty_tag;
 };
 
 enum class xml_node {

@@ -359,8 +359,6 @@ string sheet_pimpl::xml() const {
 
     writer.end_element();
 
-    writer.end_document();
-
     return writer.dump();
 }
 
@@ -408,8 +406,6 @@ void workbook_pimpl::write_workbook_xml(struct archive* a) const {
         writer.end_element();
 
         writer.end_element();
-
-        writer.end_document();
 
         data = move(writer.dump());
     }
@@ -474,8 +470,6 @@ void workbook_pimpl::write_content_types_xml(struct archive* a) const {
 
         writer.end_element();
 
-        writer.end_document();
-
         data = move(writer.dump());
     }
 
@@ -508,8 +502,6 @@ void workbook_pimpl::write_rels(struct archive* a) const {
         writer.end_element();
 
         writer.end_element();
-
-        writer.end_document();
 
         data = move(writer.dump());
     }
@@ -565,8 +557,6 @@ void workbook_pimpl::write_workbook_rels(struct archive* a) const {
 
         writer.end_element();
 
-        writer.end_document();
-
         data = move(writer.dump());
     }
 
@@ -614,8 +604,6 @@ void workbook_pimpl::write_shared_strings(struct archive* a) const {
         }
 
         writer.end_element();
-
-        writer.end_document();
 
         data = move(writer.dump());
     }
@@ -761,8 +749,6 @@ void workbook_pimpl::write_styles(struct archive* a) const {
         }
 
         writer.end_element();
-
-        writer.end_document();
 
         data = move(writer.dump());
     }
