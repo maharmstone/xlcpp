@@ -1997,35 +1997,36 @@ const list<cell>& row::cells() const {
 }
 
 ostream& operator<<(ostream& os, const cell& c) {
-    if (holds_alternative<int64_t>(c.impl->val))
-        os << get<int64_t>(c.impl->val);
-    else if (holds_alternative<double>(c.impl->val))
-        os << get<double>(c.impl->val);
-    else if (holds_alternative<bool>(c.impl->val))
-        os << (get<bool>(c.impl->val) ? "true" : "false");
-    else if (holds_alternative<shared_string>(c.impl->val))
-        os << c.impl->parent.parent.parent.shared_strings2[get<shared_string>(c.impl->val).num];
-    else if (holds_alternative<chrono::year_month_day>(c.impl->val)) {
-        const auto& d = get<chrono::year_month_day>(c.impl->val);
+    visit([&](auto&& arg) {
+        using T = decay_t<decltype(arg)>;
 
-        os << fmt::format("{:04}-{:02}-{:02}", (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
-    } else if (holds_alternative<chrono::seconds>(c.impl->val)) {
-        const auto& t = chrono::hh_mm_ss{get<chrono::seconds>(c.impl->val)};
+        if constexpr (is_same_v<T, int64_t>)
+            os << arg;
+        else if constexpr (is_same_v<T, double>)
+            os << arg;
+        else if constexpr (is_same_v<T, bool>)
+            os << (arg ? "true" : "false");
+        else if constexpr (is_same_v<T, shared_string>)
+            os << c.impl->parent.parent.parent.shared_strings2[arg.num];
+        else if constexpr (is_same_v<T, chrono::year_month_day>)
+            os << fmt::format("{:04}-{:02}-{:02}", (int)arg.year(), (unsigned int)arg.month(), (unsigned int)arg.day());
+        else if constexpr (is_same_v<T, chrono::seconds>) {
+            const auto& t = chrono::hh_mm_ss{arg};
 
-        os << fmt::format("{:02}:{:02}:{:02}", t.hours().count(), t.minutes().count(), t.seconds().count());
-    } else if (holds_alternative<datetime>(c.impl->val)) {
-        const auto& dt = get<datetime>(c.impl->val);
-        const auto& t = chrono::hh_mm_ss{dt.t};
+            os << fmt::format("{:02}:{:02}:{:02}", t.hours().count(), t.minutes().count(), t.seconds().count());
+        } else if constexpr (is_same_v<T, datetime>) {
+            const auto& t = chrono::hh_mm_ss{arg.t};
 
-        os << fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
-                          t.hours().count(), t.minutes().count(), t.seconds().count());
-    } else if (holds_alternative<nullptr_t>(c.impl->val)) {
-        // nop
-    } else if (holds_alternative<string>(c.impl->val))
-        os << get<string>(c.impl->val);
-    else
-        os << "?";
+            os << fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                            (int)arg.d.year(), (unsigned int)arg.d.month(), (unsigned int)arg.d.day(),
+                            t.hours().count(), t.minutes().count(), t.seconds().count());
+        } else if constexpr (is_same_v<T, nullptr_t>) {
+            // nop
+        } else if constexpr (is_same_v<T, string>)
+            os << arg;
+        else
+            static_assert(always_false_v<T>);
+    }, c.impl->val);
 
     return os;
 }
