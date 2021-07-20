@@ -1430,9 +1430,9 @@ void workbook_pimpl::load_sheet(const string& name, const string& data, bool vis
                 in_is = false;
         } else if (r.node_type() == xml_node::text) {
             if (in_v)
-                v_val += r.value_raw().decode();
+                v_val += r.value();
             else if (in_is)
-                is_val += r.value_raw().decode();
+                is_val += r.value();
         }
 
         depth = next_depth;
@@ -1556,7 +1556,7 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
             }
         } else if (r.node_type() == xml_node::text) {
             if (in_si)
-                si_val += decode_escape_sequences(r.value_raw().decode());
+                si_val += decode_escape_sequences(r.value());
         } else if (r.node_type() == xml_node::end_element) {
             if (r.local_name() == "si" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                 shared_strings2.emplace_back(si_val);

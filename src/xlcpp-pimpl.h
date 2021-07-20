@@ -201,7 +201,8 @@ enum class xml_node {
     element,
     end_element,
     xml_declaration,
-    comment
+    comment,
+    cdata
 };
 
 class xml_enc_string_view {
@@ -234,7 +235,7 @@ public:
     xml_enc_string_view namespace_uri_raw() const;
     std::string_view name() const;
     std::string_view local_name() const;
-    xml_enc_string_view value_raw() const;
+    std::string value() const;
 
 private:
     std::string_view sv, node;

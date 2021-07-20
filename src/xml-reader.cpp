@@ -79,7 +79,8 @@ bool xml_reader::read() {
     if (sv.empty())
         return false;
 
-    // FIXME - CDATA
+    // FIXME - processing instructions (<?xml-stylesheet type="text/xsl" href="style.xsl"?>)
+    // FIXME - DOCTYPE (<!DOCTYPE greeting SYSTEM "hello.dtd">, <!DOCTYPE greeting [ <!ELEMENT greeting (#PCDATA)> ]>)
 
     if (type == xml_node::element && empty_tag)
         namespaces.pop_back();
@@ -105,7 +106,7 @@ bool xml_reader::read() {
         }
     } else {
         if (sv.starts_with("<?xml")) {
-            auto pos = sv.find_first_of("?>");
+            auto pos = sv.find("?>");
 
             if (pos == string::npos) {
                 node = sv;
@@ -130,7 +131,7 @@ bool xml_reader::read() {
             type = xml_node::end_element;
             namespaces.pop_back();
         } else if (sv.starts_with("<!--")) {
-            auto pos = sv.find_first_of("-->");
+            auto pos = sv.find("-->");
 
             if (pos == string::npos) {
                 node = sv;
@@ -141,6 +142,16 @@ bool xml_reader::read() {
             }
 
             type = xml_node::comment;
+        } else if (sv.starts_with("<![CDATA[")) {
+            auto pos = sv.find("]]>");
+
+            if (pos == string::npos)
+                throw runtime_error("Malformed CDATA.");
+
+            node = sv.substr(0, pos + 3);
+            sv = sv.substr(pos + 3);
+
+            type = xml_node::cdata;
         } else {
             auto pos = sv.find_first_of('>');
 
@@ -273,11 +284,17 @@ string_view xml_reader::local_name() const {
         return tag.substr(pos + 1);
 }
 
-xml_enc_string_view xml_reader::value_raw() const {
-    if (type != xml_node::text)
-        return {};
+string xml_reader::value() const {
+    switch (type) {
+        case xml_node::text:
+            return xml_enc_string_view{node}.decode();
 
-    return node;
+        case xml_node::cdata:
+            return string{node.substr(9, node.length() - 12)};
+
+        default:
+            return {};
+    }
 }
 
 static string esc_char(const string_view& s) {
