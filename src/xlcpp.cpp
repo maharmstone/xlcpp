@@ -197,7 +197,7 @@ static constexpr unsigned int date_to_number(const chrono::year_month_day& ymd, 
     else if (n < 61) // Excel's 29/2/1900 bug
         n--;
 
-    return n;
+    return (unsigned int)n;
 }
 
 static_assert(date_to_number(chrono::year_month_day{1900y, chrono::January, 1d}, false) == 1);
