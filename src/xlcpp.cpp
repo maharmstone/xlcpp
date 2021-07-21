@@ -862,7 +862,7 @@ shared_string workbook_pimpl::get_shared_string(const string_view& s) {
     if (shared_strings.contains(s))
         return shared_strings.find(s)->second;
 
-    ss.num = shared_strings.size();
+    ss.num = (unsigned int)shared_strings.size();
 
     shared_strings.emplace(s, ss);
 
