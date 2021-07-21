@@ -1210,17 +1210,17 @@ static string decode_escape_sequences(const string_view& sv) {
             else if (val < 0x800) {
                 char buf[3];
 
-                buf[0] = 0xc0 | (val >> 6);
-                buf[1] = 0x80 | (val & 0x3f);
+                buf[0] = (char)(0xc0 | (val >> 6));
+                buf[1] = (char)(0x80 | (val & 0x3f));
                 buf[2] = 0;
 
                 s += buf;
             } else {
                 char buf[4];
 
-                buf[0] = 0xe0 | (val >> 12);
-                buf[1] = 0x80 | ((val & 0xfc0) >> 6);
-                buf[2] = 0x80 | (val & 0x3f);
+                buf[0] = (char)(0xe0 | (val >> 12));
+                buf[1] = (char)(0x80 | ((val & 0xfc0) >> 6));
+                buf[2] = (char)(0x80 | (val & 0x3f));
                 buf[3] = 0;
 
                 s += buf;
