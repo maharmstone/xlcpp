@@ -643,12 +643,12 @@ void workbook_pimpl::write_styles(struct archive* a) const {
 
         for (const auto& s : styles) {
             if (number_formats.find(s.number_format) == number_formats.end()) {
-                number_formats[s.number_format] = number_formats.size();
+                number_formats[s.number_format] = (unsigned int)number_formats.size();
                 number_formats2.emplace_back(&s.number_format);
             }
 
             if (fonts.find(s.font) == fonts.end()) {
-                fonts[s.font] = fonts.size();
+                fonts[s.font] = (unsigned int)fonts.size();
                 fonts2.emplace_back(&s.font);
             }
         }
