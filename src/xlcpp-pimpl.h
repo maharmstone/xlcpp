@@ -107,7 +107,7 @@ public:
         auto ret = styles.emplace(args...);
 
         if (ret.second)
-            ret.first->num = styles.size() - 1;
+            ret.first->num = (unsigned int)(styles.size() - 1);
 
         return &(*ret.first);
     }
