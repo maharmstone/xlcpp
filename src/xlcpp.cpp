@@ -1408,7 +1408,7 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
                     // so we don't have to expose shared_string publicly
                     delete c->impl;
-                    c->impl = new cell_pimpl(*row->impl, row->impl->cells.size(), ss);
+                    c->impl = new cell_pimpl(*row->impl, (unsigned int)row->impl->cells.size(), ss);
                 } else if (t_val == "e") // error
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                 else if (t_val == "str") { // string
