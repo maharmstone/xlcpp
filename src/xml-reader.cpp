@@ -311,25 +311,25 @@ static string esc_char(const string_view& s) {
     else if (c < 0x800) {
         char t[2];
 
-        t[0] = 0xc0 | (c >> 6);
-        t[1] = 0x80 | (c & 0x3f);
+        t[0] = (char)(0xc0 | (c >> 6));
+        t[1] = (char)(0x80 | (c & 0x3f));
 
         return string{string_view(t, 2)};
     } else if (c < 0x10000) {
         char t[3];
 
-        t[0] = 0xe0 | (c >> 12);
-        t[1] = 0x80 | ((c >> 6) & 0x3f);
-        t[2] = 0x80 | (c & 0x3f);
+        t[0] = (char)(0xe0 | (c >> 12));
+        t[1] = (char)(0x80 | ((c >> 6) & 0x3f));
+        t[2] = (char)(0x80 | (c & 0x3f));
 
         return string{string_view(t, 3)};
     } else {
         char t[4];
 
-        t[0] = 0xf0 | (c >> 18);
-        t[1] = 0x80 | ((c >> 12) & 0x3f);
-        t[2] = 0x80 | ((c >> 6) & 0x3f);
-        t[3] = 0x80 | (c & 0x3f);
+        t[0] = (char)(0xf0 | (c >> 18));
+        t[1] = (char)(0x80 | ((c >> 12) & 0x3f));
+        t[2] = (char)(0x80 | ((c >> 6) & 0x3f));
+        t[3] = (char)(0x80 | (c & 0x3f));
 
         return string{string_view(t, 4)};
     }

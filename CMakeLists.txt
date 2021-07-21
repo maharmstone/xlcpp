@@ -27,7 +27,7 @@ target_link_libraries(xlcpp fmt::fmt)
 
 target_compile_options(xlcpp PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-        -Wall -Wno-trigraphs>
+        -Wall -Wno-trigraphs -Wconversion>
     $<$<CXX_COMPILER_ID:MSVC>:
         /W4>)
 
