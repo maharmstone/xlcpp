@@ -72,6 +72,7 @@ class workbook_pimpl {
 public:
     workbook_pimpl() = default;
     workbook_pimpl(const std::filesystem::path& fn);
+    workbook_pimpl(const std::string_view& sv);
 #ifdef _WIN32
     workbook_pimpl(HANDLE h);
     ~workbook_pimpl();
@@ -97,6 +98,7 @@ public:
     void load_styles(const std::unordered_map<std::string, file>& files);
     void load_styles2(const std::string_view& sv);
     std::string find_number_format(unsigned int num);
+    void load_archive(struct archive* a);
 
 #ifdef _WIN32
     void rename(const std::filesystem::path& fn) const;

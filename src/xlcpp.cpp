@@ -1735,6 +1735,56 @@ private:
 };
 #endif
 
+void workbook_pimpl::load_archive(struct archive* a) {
+    struct archive_entry* entry;
+    unordered_map<string, file> files;
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
+            filesystem::path name = archive_entry_pathname(entry);
+            auto ext = name.extension().string();
+
+            for (auto& c : ext) {
+                if (c >= 'A' && c <= 'Z')
+                    c = c - 'A' + 'a';
+            }
+
+            if (ext != ".xml" && ext != ".rels")
+                continue;
+
+            string buf;
+            string tmp(BLOCK_SIZE, 0);
+
+            do {
+                auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
+
+                if (read == 0)
+                    break;
+
+                if (read < 0)
+                    throw formatted_error("archive_read_data returned {} for {} ({})", read, name.string(), archive_error_string(a));
+
+                buf += tmp.substr(0, read);
+            } while (true);
+
+            files[name.string()].data = buf;
+        }
+    }
+
+    if (files.count("[Content_Types].xml") == 0)
+        throw formatted_error("[Content_Types].xml not found.");
+
+    parse_content_types(files.at("[Content_Types].xml").data, files);
+
+    load_shared_strings(files);
+
+    load_styles(files);
+
+    auto& wb = find_workbook(files);
+
+    parse_workbook(wb.first, wb.second.data, files);
+}
+
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 #ifdef _WIN32
     h = CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
@@ -1750,7 +1800,6 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
     }
 #else
     struct archive* a = archive_read_new();
-    struct archive_entry* entry;
 
     try {
         archive_read_support_format_zip(a);
@@ -1760,52 +1809,7 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         if (r != ARCHIVE_OK)
             throw formatted_error("{}", archive_error_string(a));
 
-        unordered_map<string, file> files;
-
-        while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
-                filesystem::path name = archive_entry_pathname(entry);
-                auto ext = name.extension().string();
-
-                for (auto& c : ext) {
-                    if (c >= 'A' && c <= 'Z')
-                        c = c - 'A' + 'a';
-                }
-
-                if (ext != ".xml" && ext != ".rels")
-                    continue;
-
-                string buf;
-                string tmp(BLOCK_SIZE, 0);
-
-                do {
-                    auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
-
-                    if (read == 0)
-                        break;
-
-                    if (read < 0)
-                        throw formatted_error("archive_read_data returned {} for {} ({})", read, name.string(), archive_error_string(a));
-
-                    buf += tmp.substr(0, read);
-                } while (true);
-
-                files[name.string()].data = buf;
-            }
-        }
-
-        if (files.count("[Content_Types].xml") == 0)
-            throw formatted_error("[Content_Types].xml not found.");
-
-        parse_content_types(files.at("[Content_Types].xml").data, files);
-
-        load_shared_strings(files);
-
-        load_styles(files);
-
-        auto& wb = find_workbook(files);
-
-        parse_workbook(wb.first, wb.second.data, files);
+        load_archive(a);
     } catch (...) {
         archive_read_free(a);
         throw;
@@ -1815,10 +1819,29 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 #endif
 }
 
+workbook_pimpl::workbook_pimpl(const string_view& sv) {
+    struct archive* a = archive_read_new();
+
+    try {
+        archive_read_support_format_zip(a);
+
+        auto r = archive_read_open_memory(a, sv.data(), sv.length());
+
+        if (r != ARCHIVE_OK)
+            throw formatted_error("{}", archive_error_string(a));
+
+        load_archive(a);
+    } catch (...) {
+        archive_read_free(a);
+        throw;
+    }
+
+    archive_read_free(a);
+}
+
 #ifdef _WIN32
 workbook_pimpl::workbook_pimpl(HANDLE h) {
     struct archive* a = archive_read_new();
-    struct archive_entry* entry;
 
     try {
         archive_read_support_format_zip(a);
@@ -1843,52 +1866,7 @@ workbook_pimpl::workbook_pimpl(HANDLE h) {
         if (r != ARCHIVE_OK)
             throw formatted_error("{}", archive_error_string(a));
 
-        unordered_map<string, file> files;
-
-        while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-            if (archive_entry_filetype(entry) == AE_IFREG && archive_entry_pathname(entry)) {
-                filesystem::path name = archive_entry_pathname(entry);
-                auto ext = name.extension().string();
-
-                for (auto& c : ext) {
-                    if (c >= 'A' && c <= 'Z')
-                        c = c - 'A' + 'a';
-                }
-
-                if (ext != ".xml" && ext != ".rels")
-                    continue;
-
-                string buf;
-                string tmp(BLOCK_SIZE, 0);
-
-                do {
-                    auto read = archive_read_data(a, tmp.data(), BLOCK_SIZE);
-
-                    if (read == 0)
-                        break;
-
-                    if (read < 0)
-                        throw formatted_error("archive_read_data returned {} for {} ({})", read, name.string(), archive_error_string(a));
-
-                    buf += tmp.substr(0, read);
-                } while (true);
-
-                files[name.string()].data = buf;
-            }
-        }
-
-        if (files.count("[Content_Types].xml") == 0)
-            throw formatted_error("[Content_Types].xml not found.");
-
-        parse_content_types(files.at("[Content_Types].xml").data, files);
-
-        load_shared_strings(files);
-
-        load_styles(files);
-
-        auto& wb = find_workbook(files);
-
-        parse_workbook(wb.first, wb.second.data, files);
+        load_archive(a);
     } catch (...) {
         archive_read_free(a);
         throw;
@@ -1905,6 +1883,10 @@ workbook_pimpl::~workbook_pimpl() {
 
 workbook::workbook(const filesystem::path& fn) {
     impl = new workbook_pimpl(fn);
+}
+
+workbook::workbook(const string_view& sv) {
+    impl = new workbook_pimpl(sv);
 }
 
 #ifdef _WIN32

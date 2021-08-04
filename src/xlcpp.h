@@ -39,6 +39,7 @@ class XLCPP workbook {
 public:
     workbook();
     workbook(const std::filesystem::path& fn);
+    workbook(const std::string_view& sv);
 #ifdef _WIN32
     workbook(HANDLE h);
 #endif
