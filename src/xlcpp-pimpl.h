@@ -244,3 +244,14 @@ private:
     bool empty_tag;
     std::vector<ns_list> namespaces;
 };
+
+class archive_read_closer {
+public:
+    typedef archive* pointer;
+
+    void operator()(archive* a) {
+        archive_read_free(a);
+    }
+};
+
+using archive_read_t = std::unique_ptr<archive*, archive_read_closer>;

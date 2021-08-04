@@ -1799,80 +1799,59 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
         throw;
     }
 #else
-    struct archive* a = archive_read_new();
+    archive_read_t a{archive_read_new()};
 
-    try {
-        archive_read_support_format_zip(a);
+    archive_read_support_format_zip(a.get());
 
-        auto r = archive_read_open_filename(a, fn.string().c_str(), BLOCK_SIZE);
+    auto r = archive_read_open_filename(a.get(), fn.string().c_str(), BLOCK_SIZE);
 
-        if (r != ARCHIVE_OK)
-            throw formatted_error("{}", archive_error_string(a));
+    if (r != ARCHIVE_OK)
+        throw formatted_error("{}", archive_error_string(a.get()));
 
-        load_archive(a);
-    } catch (...) {
-        archive_read_free(a);
-        throw;
-    }
-
-    archive_read_free(a);
+    load_archive(a.get());
 #endif
 }
 
 workbook_pimpl::workbook_pimpl(const string_view& sv) {
-    struct archive* a = archive_read_new();
+    archive_read_t a{archive_read_new()};
 
-    try {
-        archive_read_support_format_zip(a);
+    archive_read_support_format_zip(a.get());
 
-        auto r = archive_read_open_memory(a, sv.data(), sv.length());
+    auto r = archive_read_open_memory(a.get(), sv.data(), sv.length());
 
-        if (r != ARCHIVE_OK)
-            throw formatted_error("{}", archive_error_string(a));
+    if (r != ARCHIVE_OK)
+        throw formatted_error("{}", archive_error_string(a.get()));
 
-        load_archive(a);
-    } catch (...) {
-        archive_read_free(a);
-        throw;
-    }
-
-    archive_read_free(a);
+    load_archive(a.get());
 }
 
 #ifdef _WIN32
 workbook_pimpl::workbook_pimpl(HANDLE h) {
-    struct archive* a = archive_read_new();
+    archive_read_t a{archive_read_new()};
 
-    try {
-        archive_read_support_format_zip(a);
+    archive_read_support_format_zip(a.get());
 
-        this->h2 = h;
+    this->h2 = h;
 
-        auto r = archive_read_open(a, this, archive_dummy_callback,
-                                   [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
-                                       auto impl = (workbook_pimpl*)client_data;
-                                       DWORD read;
+    auto r = archive_read_open(a.get(), this, archive_dummy_callback,
+                                [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
+                                    auto impl = (workbook_pimpl*)client_data;
+                                    DWORD read;
 
-                                       if (!ReadFile(impl->h2, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
-                                           archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
-                                           return -1;
-                                       }
+                                    if (!ReadFile(impl->h2, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
+                                        archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
+                                        return -1;
+                                    }
 
-                                       *buffer = impl->readbuf;
+                                    *buffer = impl->readbuf;
 
-                                       return read;
-                                   }, archive_dummy_callback);
+                                    return read;
+                                }, archive_dummy_callback);
 
-        if (r != ARCHIVE_OK)
-            throw formatted_error("{}", archive_error_string(a));
+    if (r != ARCHIVE_OK)
+        throw formatted_error("{}", archive_error_string(a.get()));
 
-        load_archive(a);
-    } catch (...) {
-        archive_read_free(a);
-        throw;
-    }
-
-    archive_read_free(a);
+    load_archive(a.get());
 }
 
 workbook_pimpl::~workbook_pimpl() {
