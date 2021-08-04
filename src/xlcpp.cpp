@@ -810,36 +810,26 @@ la_ssize_t workbook_pimpl::write_callback(struct archive* a, const void* buffer,
 }
 
 string workbook_pimpl::data() const {
-    struct archive* a;
-    int ret;
-
     buf.clear();
 
-    a = archive_write_new();
+    archive_write_t a{archive_write_new()};
 
-    try {
-        archive_write_set_format_zip(a);
-        archive_write_set_bytes_in_last_block(a, 1);
+    archive_write_set_format_zip(a.get());
+    archive_write_set_bytes_in_last_block(a.get(), 1);
 
-        ret = archive_write_open(a, (void*)this, archive_dummy_callback,
-                                [](struct archive* a, void* client_data, const void* buffer, size_t length) {
-                                    auto wb = (const workbook_pimpl*)client_data;
+    auto ret = archive_write_open(a.get(), (void*)this, archive_dummy_callback,
+                            [](struct archive* a, void* client_data, const void* buffer, size_t length) {
+                                auto wb = (const workbook_pimpl*)client_data;
 
-                                    return wb->write_callback(a, buffer, length);
-                                },
-                                archive_dummy_callback);
-        if (ret != ARCHIVE_OK)
-            throw formatted_error("archive_write_open returned {}.", ret);
+                                return wb->write_callback(a, buffer, length);
+                            },
+                            archive_dummy_callback);
+    if (ret != ARCHIVE_OK)
+        throw formatted_error("archive_write_open returned {}.", ret);
 
-        write_archive(a);
+    write_archive(a.get());
 
-        archive_write_close(a);
-    } catch (...) {
-        archive_write_free(a);
-        throw;
-    }
-
-    archive_write_free(a);
+    archive_write_close(a.get());
 
     return buf;
 }

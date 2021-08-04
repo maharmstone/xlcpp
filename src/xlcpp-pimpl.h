@@ -255,3 +255,14 @@ public:
 };
 
 using archive_read_t = std::unique_ptr<archive*, archive_read_closer>;
+
+class archive_write_closer {
+public:
+    typedef archive* pointer;
+
+    void operator()(archive* a) {
+        archive_write_free(a);
+    }
+};
+
+using archive_write_t = std::unique_ptr<archive*, archive_write_closer>;
