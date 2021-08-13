@@ -21,6 +21,7 @@ using namespace std;
 static const string NS_SPREADSHEET = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 static const string NS_SPREADSHEET_STRICT = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 static const string NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+static const string NS_RELATIONSHIPS_STRICT = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
 static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
 
@@ -1487,14 +1488,21 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
                     bool visible = true;
 
                     auto sheet_name = try_decode(r.get_attribute("name"));
-                    auto rid = try_decode(r.get_attribute("id", NS_RELATIONSHIPS));
+                    string rid;
 
-                    auto statesv = r.get_attribute("state");
-                    if (statesv)
-                        visible = statesv.value().decode() != "hidden";
+                    if (r.get_attribute("id", NS_RELATIONSHIPS).has_value())
+                        rid = r.get_attribute("id", NS_RELATIONSHIPS).value().decode();
+                    else if (r.get_attribute("id", NS_RELATIONSHIPS_STRICT).has_value())
+                        rid = r.get_attribute("id", NS_RELATIONSHIPS_STRICT).value().decode();
 
-                    if (!sheet_name.empty() && !rid.empty())
-                        sheets_rels.emplace_back(rid, sheet_name, visible);
+                    if (!rid.empty()) {
+                        auto statesv = r.get_attribute("state");
+                        if (statesv)
+                            visible = statesv.value().decode() != "hidden";
+
+                        if (!sheet_name.empty())
+                            sheets_rels.emplace_back(rid, sheet_name, visible);
+                    }
                 }
             }
         }
