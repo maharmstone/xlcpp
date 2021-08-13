@@ -19,6 +19,7 @@
 using namespace std;
 
 static const string NS_SPREADSHEET = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+static const string NS_SPREADSHEET_STRICT = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 static const string NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 static const string NS_PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
 static const string NS_CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -1251,14 +1252,14 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "worksheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() != "worksheet" || (!r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}worksheet.",
                                           r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
                 }
-            } else if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
+            } else if (depth == 1 && r.local_name() == "sheetData" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)) && !r.is_empty())
                 in_sheet_data = true;
             else if (in_sheet_data) {
-                if (r.local_name() == "row" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() == "row" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     unsigned int row_index = 0;
                     auto rsv = r.get_attribute("r");
 
@@ -1287,7 +1288,7 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
                     last_index = row_index;
                     last_col = 0;
-                } else if (row && r.local_name() == "c" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                } else if (row && r.local_name() == "c" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     unsigned int row_num, col_num;
                     auto r_val = try_decode(r.get_attribute("r"));
 
@@ -1318,17 +1319,17 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
                     if (r.is_empty())
                         row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                } else if (row && r.local_name() == "v" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
+                } else if (row && r.local_name() == "v" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)) && !r.is_empty())
                     in_v = true;
-                else if (row && r.local_name() == "is" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
+                else if (row && r.local_name() == "is" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)) && !r.is_empty())
                     in_is = true;
             }
         } else if (r.node_type() == xml_node::end_element) {
-            if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            if (depth == 1 && r.local_name() == "sheetData" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 in_sheet_data = false;
-            else if (depth == 2 && r.local_name() == "row" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            else if (depth == 2 && r.local_name() == "row" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 row = nullptr;
-            else if (row && r.local_name() == "c" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+            else if (row && r.local_name() == "c" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                 cell* c;
                 string number_format;
 
@@ -1426,9 +1427,9 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
                 if (!s_val.empty())
                     c->impl->number_format = number_format;
-            } else if (in_v && r.local_name() == "v" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            } else if (in_v && r.local_name() == "v" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 in_v = false;
-            else if (in_is && r.local_name() == "is" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            else if (in_is && r.local_name() == "is" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 in_is = false;
         } else if (r.node_type() == xml_node::text) {
             if (in_v)
@@ -1468,12 +1469,12 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "workbook" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() != "workbook" || (!r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}workbook.",
                                           r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
                 }
             } else if (depth == 1) {
-                if (r.local_name() == "workbookPr" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() == "workbookPr" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     auto date1904sv = r.get_attribute("date1904");
 
                     if (date1904sv) {
@@ -1482,7 +1483,7 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
                     }
                 }
             } else if (depth == 2) {
-                if (r.local_name() == "sheet" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() == "sheet" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     bool visible = true;
 
                     auto sheet_name = try_decode(r.get_attribute("name"));
@@ -1550,12 +1551,12 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "sst" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() != "sst" || (!r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}sst.",
                                           r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
                 }
             } else if (depth == 1) {
-                if (r.local_name() == "si" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() == "si" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     in_si = true;
                     si_val = "";
                 }
@@ -1564,7 +1565,7 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
             if (in_si)
                 si_val += decode_escape_sequences(r.value());
         } else if (r.node_type() == xml_node::end_element) {
-            if (r.local_name() == "si" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+            if (r.local_name() == "si" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                 shared_strings2.emplace_back(si_val);
                 in_si = false;
             }
@@ -1600,17 +1601,17 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "styleSheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (r.local_name() != "styleSheet" || (!r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}styleSheet.",
                                           r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
                 }
             } else if (depth == 1) {
-                if (r.local_name() == "numFmts" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
+                if (r.local_name() == "numFmts" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)) && !r.is_empty())
                     in_numfmts = true;
-                else if (r.local_name() == "cellXfs" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
+                else if (r.local_name() == "cellXfs" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)) && !r.is_empty())
                     in_cellxfs = true;
             } else if (depth == 2) {
-                if (in_numfmts && r.local_name() == "numFmt" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                if (in_numfmts && r.local_name() == "numFmt" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     unsigned int id = 0;
                     string format_code;
 
@@ -1625,7 +1626,7 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                         if (id != 0)
                             number_formats[id] = try_decode(r.get_attribute("formatCode"));
                     }
-                } else if (in_cellxfs && r.local_name() == "xf" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                } else if (in_cellxfs && r.local_name() == "xf" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT))) {
                     optional<unsigned int> numfmtid;
                     bool apply_number_format = true;
 
@@ -1655,9 +1656,9 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
                 }
             }
         } else if (r.node_type() == xml_node::end_element) {
-            if (in_numfmts && r.local_name() == "numFmts" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            if (in_numfmts && r.local_name() == "numFmts" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 in_numfmts = false;
-            else if (in_cellxfs && r.local_name() == "cellXfs" && r.namespace_uri_raw().cmp(NS_SPREADSHEET))
+            else if (in_cellxfs && r.local_name() == "cellXfs" && (r.namespace_uri_raw().cmp(NS_SPREADSHEET) || r.namespace_uri_raw().cmp(NS_SPREADSHEET_STRICT)))
                 in_cellxfs = false;
         }
 
