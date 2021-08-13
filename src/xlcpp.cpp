@@ -983,8 +983,10 @@ static void parse_content_types(const string_view& ct, unordered_map<string, fil
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "Types" || !r.namespace_uri_raw().cmp(NS_CONTENT_TYPES))
-                    throw formatted_error("Root tag name was not \"Types\".");
+                if (r.local_name() != "Types" || !r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}Types.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_CONTENT_TYPES);
+                }
             } else if (depth == 1) {
                 if (r.local_name() == "Default" && !r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
                     auto ext = try_decode(r.get_attribute("Extension"));
@@ -1070,8 +1072,10 @@ static unordered_map<string, string> read_relationships(const string_view& fn, c
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "Relationships" || !r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS))
-                    throw formatted_error("Root tag name was not \"Relationships\".");
+                if (r.local_name() != "Relationships" || !r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}Relationships.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_PACKAGE_RELATIONSHIPS);
+                }
             } else if (depth == 1) {
                 if (r.local_name() == "Relationship" && r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
                     auto id = try_decode(r.get_attribute("Id"));
@@ -1247,8 +1251,10 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "worksheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET))
-                    throw formatted_error("Root tag name was not \"worksheet\".");
+                if (r.local_name() != "worksheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}worksheet.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
+                }
             } else if (depth == 1 && r.local_name() == "sheetData" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
                 in_sheet_data = true;
             else if (in_sheet_data) {
@@ -1462,8 +1468,10 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "workbook" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET))
-                    throw formatted_error("Root tag name was not \"workbook\".");
+                if (r.local_name() != "workbook" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}workbook.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
+                }
             } else if (depth == 1) {
                 if (r.local_name() == "workbookPr" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                     auto date1904sv = r.get_attribute("date1904");
@@ -1542,8 +1550,10 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "sst" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET))
-                    throw formatted_error("Root tag name was not \"sst\".");
+                if (r.local_name() != "sst" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}sst.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
+                }
             } else if (depth == 1) {
                 if (r.local_name() == "si" && r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
                     in_si = true;
@@ -1590,8 +1600,10 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
 
         if (r.node_type() == xml_node::element) {
             if (depth == 0) {
-                if (r.local_name() != "styleSheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET))
-                    throw formatted_error("Root tag name was not \"styleSheet\".");
+                if (r.local_name() != "styleSheet" || !r.namespace_uri_raw().cmp(NS_SPREADSHEET)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}styleSheet.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_SPREADSHEET);
+                }
             } else if (depth == 1) {
                 if (r.local_name() == "numFmts" && r.namespace_uri_raw().cmp(NS_SPREADSHEET) && !r.is_empty())
                     in_numfmts = true;
