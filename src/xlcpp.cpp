@@ -1230,6 +1230,69 @@ static string decode_escape_sequences(const string_view& sv) {
     return s;
 }
 
+static constexpr bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
+    if (y == 0 || m == 0 || d == 0)
+        return false;
+
+    if (d > 31 || m > 12)
+        return false;
+
+    if (d == 31 && (m == 4 || m == 6 || m == 9 || m == 11))
+        return false;
+
+    if (d == 30 && m == 2)
+        return false;
+
+    if (d == 29 && m == 2) {
+        if (y % 4)
+            return false;
+
+        if (!(y % 100) && y % 400)
+            return false;
+    }
+
+    return true;
+}
+
+static constexpr bool __inline is_digit(char c) noexcept {
+    return c >= '0' && c <= '9';
+}
+
+static variant<datetime, chrono::year_month_day> parse_iso8601(string_view t) {
+    if (t.length() >= 10 && is_digit(t[0]) && is_digit(t[1]) && is_digit(t[2]) && is_digit(t[3]) &&
+        t[4] == '-' && is_digit(t[5]) && is_digit(t[6]) && t[7] == '-' && is_digit(t[8]) &&
+        is_digit(t[9])) {
+        uint16_t y;
+        uint8_t mon, d;
+
+        from_chars_constexpr(t.data(), t.data() + 4, y);
+        from_chars_constexpr(t.data() + 5, t.data() + 7, mon);
+        from_chars_constexpr(t.data() + 8, t.data() + 10, d);
+
+        if (!is_valid_date(y, mon, d))
+            throw formatted_error("Invalid ISO 8601 date \"{}\".", t);
+
+        if (t.length() >= 19 && t[10] == 'T' && is_digit(t[11]) && is_digit(t[12]) && t[13] == ':' &&
+            is_digit(t[14]) && is_digit(t[15]) && t[16] == ':' && is_digit(t[17]) && is_digit(t[18])) {
+            uint8_t h, mins, s;
+
+            from_chars_constexpr(t.data() + 11, t.data() + 13, h);
+            from_chars_constexpr(t.data() + 14, t.data() + 16, mins);
+            from_chars_constexpr(t.data() + 17, t.data() + 19, s);
+
+            if (h >= 24 || mins >= 60 || s >= 60)
+                throw formatted_error("Invalid ISO 8601 date \"{}\".", t);
+
+            // FIXME - fractional seconds?
+
+            return datetime(chrono::year{y}, chrono::month{mon}, chrono::day{d}, chrono::hours{h}, chrono::minutes{mins}, chrono::seconds{s});
+        }
+
+        return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{d}};
+    } else
+        throw formatted_error("Failed to parse ISO 8601 date \"{}\".", t);
+}
+
 void workbook_pimpl::load_sheet(const string_view& name, const string_view& data, bool visible) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
@@ -1423,6 +1486,12 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
                         // so we don't have to expose shared_string publicly
                         c->impl->val = decode_escape_sequences(is_val);
                     }
+                } else if (t_val == "d") { // datetime
+                    auto dt = parse_iso8601(v_val);
+
+                    visit([&](auto&& arg) {
+                        c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, arg);
+                    }, dt);
                 } else
                     throw formatted_error("Unhandled cell type value \"{}\".", t_val);
 
