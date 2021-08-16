@@ -1421,7 +1421,7 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
 
                         auto [ptr, ec] = from_chars(v_val.data(), v_val.data() + v_val.length(), num);
 
-                        if (ptr == v_val.data() + v_val.length()) {
+                        if (ec == errc() && ptr == v_val.data() + v_val.length()) {
                             auto ymd = number_to_date(num, date1904);
 
                             c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
