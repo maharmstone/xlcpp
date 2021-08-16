@@ -197,6 +197,7 @@ private:
 };
 
 enum class xml_node {
+    unknown,
     text,
     whitespace,
     element,
@@ -240,7 +241,7 @@ public:
 
 private:
     std::string_view sv, node;
-    enum xml_node type;
+    enum xml_node type = xml_node::unknown;
     bool empty_tag;
     std::vector<ns_list> namespaces;
 };
