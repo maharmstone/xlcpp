@@ -1299,7 +1299,7 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
     xml_reader r(data);
     unsigned int depth = 0;
     bool in_sheet_data = false;
-    unsigned int last_index = 0, last_col;
+    unsigned int last_index = 0, last_col = 0;
     row* row = nullptr;
     string s_val, t_val, v_val, is_val;
     bool in_v = false, in_is = false;
