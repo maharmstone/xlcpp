@@ -1175,6 +1175,17 @@ static constexpr bool __inline is_hex(char c) noexcept {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
+static constexpr uint8_t __inline hex_digit(char c) noexcept {
+    if (c >= '0' && c <= '9')
+        return (uint8_t)(c - '0');
+    else if (c >= 'A' && c <= 'F')
+        return (uint8_t)(c - 'A' + 0xa);
+    else if (c >= 'a' && c <= 'f')
+        return (uint8_t)(c - 'a' + 0xa);
+
+    return 0;
+}
+
 static string decode_escape_sequences(const string_view& sv) {
     bool has_underscore = false;
 
@@ -1197,9 +1208,7 @@ static string decode_escape_sequences(const string_view& sv) {
 
     for (unsigned int i = 0; i < sv.length(); i++) {
         if (i + 6 < sv.length() && sv[i] == '_' && sv[i+1] == 'x' && is_hex(sv[i+2]) && is_hex(sv[i+3]) && is_hex(sv[i+4]) && is_hex(sv[i+5]) && sv[i+6] == '_') {
-            uint16_t val;
-
-            from_chars(&sv[i+2], &sv[i+6], val, 16);
+            auto val = (uint16_t)((hex_digit(sv[i+2]) << 12) | (hex_digit(sv[i+3]) << 8) | (hex_digit(sv[i+4]) << 4) | hex_digit(sv[i+5]));
 
             if (val < 0x80)
                 s += (char)val;
