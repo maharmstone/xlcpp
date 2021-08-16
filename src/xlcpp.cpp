@@ -117,10 +117,10 @@ static constexpr from_chars_result from_chars_constexpr(const char* first, const
     res.ptr = first;
     res.ec = {};
 
+    t = 0;
+
     if (first == last || *first < '0' || *first > '9')
         return res;
-
-    t = 0;
 
     while (first != last && *first >= '0' && *first <= '9') {
         t *= 10;
