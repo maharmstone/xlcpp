@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 #include <filesystem>
 #include "mmap.h"
+#include "utf16.h"
 
 using namespace std;
 
@@ -28,7 +29,43 @@ struct structured_storage_header {
     uint32_t sect_dif[109];
 };
 
-static_assert(sizeof(structured_storage_header) == 512);
+static_assert(sizeof(structured_storage_header) == 0x200);
+
+enum class obj_type : uint8_t {
+    STGTY_INVALID = 0,
+    STGTY_STORAGE = 1,
+    STGTY_STREAM = 2,
+    STGTY_LOCKBYTES = 3,
+    STGTY_PROPERTY = 4,
+    STGTY_ROOT = 5
+};
+
+enum class tree_colour : uint8_t {
+    red = 0,
+    black = 1
+};
+
+#pragma pack(push,1)
+
+struct dirent {
+    char16_t name[32];
+    uint16_t name_len;
+    obj_type type;
+    tree_colour colour;
+    uint32_t sid_left_sibling;
+    uint32_t sid_right_sibling;
+    uint32_t sid_child;
+    uint8_t clsid[16];
+    uint32_t user_flags;
+    uint64_t create_time;
+    uint64_t modify_time;
+    uint32_t sect_start;
+    uint64_t size;
+};
+
+#pragma pack(pop)
+
+static_assert(sizeof(dirent) == 0x80);
 
 static void cfbf_test(const filesystem::path& fn) {
     unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
@@ -64,6 +101,23 @@ static void cfbf_test(const filesystem::path& fn) {
     for (unsigned int i = 0; i < ssh.num_sect_dif; i++) {
         fmt::print("sect_dif = {:x}\n", ssh.sect_dif[i]);
     }
+
+    fmt::print("---\n");
+
+    auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+
+    fmt::print("name = \"{}\"\n", de.name_len >= sizeof(char16_t) ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "");
+    fmt::print("type = {:x}\n", (unsigned int)de.type);
+    fmt::print("colour = {:x}\n", (unsigned int)de.colour);
+    fmt::print("sid_left_sibling = {:x}\n", de.sid_left_sibling);
+    fmt::print("sid_right_sibling = {:x}\n", de.sid_right_sibling);
+    fmt::print("sid_child = {:x}\n", de.sid_child);
+    fmt::print("clsid = {:x}\n", *(uint64_t*)de.clsid);
+    fmt::print("user_flags = {:x}\n", de.user_flags);
+    fmt::print("create_time = {:x}\n", de.create_time);
+    fmt::print("modify_time = {:x}\n", de.modify_time);
+    fmt::print("sect_start = {:x}\n", de.sect_start);
+    fmt::print("size = {:x}\n", de.size);
 }
 
 int main() {
