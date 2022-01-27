@@ -1,5 +1,6 @@
 #include <fmt/format.h>
-#include <fstream>
+#include <filesystem>
+#include "mmap.h"
 
 using namespace std;
 
@@ -29,15 +30,14 @@ struct structured_storage_header {
 
 static_assert(sizeof(structured_storage_header) == 512);
 
-static void cfbf_test(const string& fn) {
-    structured_storage_header ssh;
+static void cfbf_test(const filesystem::path& fn) {
+    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
-    ifstream f(fn);
+    mmap m(hup.get());
 
-    if (!f.good())
-        throw runtime_error("Failed to open file.");
+    auto s = m.map();
 
-    f.read((char*)&ssh, sizeof(ssh));
+    auto& ssh = *(structured_storage_header*)s.data();
 
     if (ssh.sig != CFBF_SIGNATURE)
         throw runtime_error("Incorrect signature.");
