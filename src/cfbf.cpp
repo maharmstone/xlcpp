@@ -6,6 +6,7 @@
 using namespace std;
 
 static const uint64_t CFBF_SIGNATURE = 0xe11ab1a1e011cfd0;
+static const uint32_t NOSTREAM = 0xffffffff;
 
 struct structured_storage_header {
     uint64_t sig;
@@ -67,6 +68,29 @@ struct dirent {
 
 static_assert(sizeof(dirent) == 0x80);
 
+static void print_dirent(span<const std::byte> dirents, uint32_t num, string_view prefix) {
+    auto& de = *(dirent*)(dirents.data() + (num * sizeof(dirent)));
+
+    fmt::print("{}{}\n", prefix, de.name_len >= sizeof(char16_t) ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "");
+    fmt::print("{}  type = {:x}\n", prefix, (unsigned int)de.type);
+    fmt::print("{}  colour = {:x}\n", prefix, (unsigned int)de.colour);
+    fmt::print("{}  sid_left_sibling = {:x}\n", prefix, de.sid_left_sibling);
+    fmt::print("{}  sid_right_sibling = {:x}\n", prefix, de.sid_right_sibling);
+    fmt::print("{}  sid_child = {:x}\n", prefix, de.sid_child);
+    fmt::print("{}  clsid = {:x}\n", prefix, *(uint64_t*)de.clsid);
+    fmt::print("{}  user_flags = {:x}\n", prefix, de.user_flags);
+    fmt::print("{}  create_time = {:x}\n", prefix, de.create_time);
+    fmt::print("{}  modify_time = {:x}\n", prefix, de.modify_time);
+    fmt::print("{}  sect_start = {:x}\n", prefix, de.sect_start);
+    fmt::print("{}  size = {:x}\n", prefix, de.size);
+
+    if (de.sid_child != NOSTREAM)
+        print_dirent(dirents, de.sid_child, string(prefix) + "    ");
+
+    if (de.sid_right_sibling != NOSTREAM)
+        print_dirent(dirents, de.sid_right_sibling, prefix);
+}
+
 static void cfbf_test(const filesystem::path& fn) {
     unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
@@ -106,18 +130,10 @@ static void cfbf_test(const filesystem::path& fn) {
 
     auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
 
-    fmt::print("name = \"{}\"\n", de.name_len >= sizeof(char16_t) ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "");
-    fmt::print("type = {:x}\n", (unsigned int)de.type);
-    fmt::print("colour = {:x}\n", (unsigned int)de.colour);
-    fmt::print("sid_left_sibling = {:x}\n", de.sid_left_sibling);
-    fmt::print("sid_right_sibling = {:x}\n", de.sid_right_sibling);
-    fmt::print("sid_child = {:x}\n", de.sid_child);
-    fmt::print("clsid = {:x}\n", *(uint64_t*)de.clsid);
-    fmt::print("user_flags = {:x}\n", de.user_flags);
-    fmt::print("create_time = {:x}\n", de.create_time);
-    fmt::print("modify_time = {:x}\n", de.modify_time);
-    fmt::print("sect_start = {:x}\n", de.sect_start);
-    fmt::print("size = {:x}\n", de.size);
+    if (de.type != obj_type::STGTY_ROOT)
+        throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
+
+    print_dirent(s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift)), 0, "");
 }
 
 int main() {
