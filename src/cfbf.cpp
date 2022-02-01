@@ -1,4 +1,5 @@
 #include <fmt/format.h>
+#include <fstream>
 #include "cfbf.h"
 #include "utf16.h"
 
@@ -130,10 +131,57 @@ void cfbf::add_entry(string_view path, uint32_t num) {
 cfbf_entry::cfbf_entry(cfbf& file, dirent& de, string_view name) : file(file), de(de), name(name) {
 }
 
+uint32_t cfbf::next_sector(uint32_t sector) const {
+    auto& ssh = *(structured_storage_header*)s.data();
+    auto fat = (uint32_t*)(s.data() + ((ssh.sect_dif[0] + 1) << ssh.sector_shift));
+
+    return fat[sector];
+}
+
+size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
+    auto& ssh = *(structured_storage_header*)file.s.data();
+
+    if (off > de.size)
+        return 0;
+
+    if (off + buf.size() > de.size)
+        buf = buf.subspan(0, de.size - off);
+
+    if (de.size < ssh.mini_sector_cutoff) {
+        // FIXME - mini-FAT
+        throw runtime_error("FIXME - mini-FAT");
+    } else {
+        auto sector = de.sect_start;
+        auto sector_skip = off >> ssh.sector_shift;
+        size_t read = 0;
+
+        for (unsigned int i = 0; i < sector_skip; i++) {
+            sector = file.next_sector(sector);
+        }
+
+        do {
+            auto src = file.s.subspan((sector + 1) << ssh.sector_shift, 1 << ssh.sector_shift);
+            auto to_copy = min(src.size(), buf.size());
+
+            memcpy(buf.data(), src.data(), to_copy);
+
+            read += to_copy;
+            buf = buf.subspan(to_copy);
+
+            if (buf.empty())
+                break;
+
+            sector = file.next_sector(sector);
+        } while (true);
+
+        return read;
+    }
+}
+
 static void cfbf_test(const filesystem::path& fn) {
     cfbf c(fn);
 
-    for (const auto& e : c.entries) {
+    for (unsigned int num = 0; const auto& e : c.entries) {
         fmt::print("{}\n", e.name);
         fmt::print("  type = {:x}\n", (unsigned int)e.de.type);
         fmt::print("  colour = {:x}\n", (unsigned int)e.de.colour);
@@ -147,6 +195,34 @@ static void cfbf_test(const filesystem::path& fn) {
         fmt::print("  sect_start = {:x}\n", e.de.sect_start);
         fmt::print("  size = {:x}\n", e.de.size);
         fmt::print("--\n");
+
+        if (num == 0) { // root
+            num++;
+            continue;
+        }
+
+        if (e.de.size < 0x1000) { // FIXME
+            num++;
+            continue;
+        }
+
+        ofstream f("file" + to_string(num));
+
+        uint64_t off = 0;
+        std::byte buf[4096];
+
+        while (true) {
+            auto size = e.read(buf, off);
+
+            if (size == 0)
+                break;
+
+            f.write((char*)buf, size); // FIXME - throw exception if fails
+
+            off += size;
+        }
+
+        num++;
     }
 }
 
