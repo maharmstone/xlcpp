@@ -26,9 +26,6 @@ A million repetitions of "a"
 
 using namespace std;
 
-#define blk(i,l) (l[i&15] = rotl(l[(i+13)&15]^l[(i+8)&15] \
-    ^l[(i+2)&15]^l[i&15],1))
-
 constexpr void R0(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t& bl) {
     z += (w & (x^y)) ^ y;
 
@@ -77,7 +74,17 @@ constexpr void R3(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
     w = rotl(w, 30);
 }
 
-#define R4(v,w,x,y,z,i,l) z+=(w^x^y)+blk(i,l)+0xCA62C1D6+rotl(v,5);w=rotl(w,30);
+constexpr void R4(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t i, uint32_t* l) {
+    z += w ^ x ^ y;
+
+    l[i&15] = rotl(l[(i+13)&15] ^ l[(i+8)&15] ^ l[(i+2)&15] ^ l[i&15], 1);
+    z += l[i&15];
+
+    z += 0xca62c1d6;
+    z += rotl(v,5);
+
+    w = rotl(w,30);
+}
 
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
