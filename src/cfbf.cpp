@@ -291,9 +291,9 @@ struct encryption_header {
 static const uint32_t ALG_ID_AES_128 = 0x660e;
 static const uint32_t ALG_ID_SHA_1 = 0x8004;
 
-static void check_password(u16string_view password, span<const uint8_t> salt,
-                           span<const uint8_t> encrypted_verifier,
-                           span<const uint8_t> encrypted_verifier_hash) {
+void cfbf::check_password(u16string_view password, span<const uint8_t> salt,
+                          span<const uint8_t> encrypted_verifier,
+                          span<const uint8_t> encrypted_verifier_hash) {
     auto key = generate_key(password, salt);
     AES_ctx ctx;
     array<uint8_t, 16> verifier;
@@ -332,9 +332,11 @@ static void check_password(u16string_view password, span<const uint8_t> salt,
 
     if (memcmp(hash.data(), verifier_hash.data(), hash.size()))
         throw runtime_error("Incorrect password.");
+
+    this->key = key;
 }
 
-static void parse_enc_info(span<const uint8_t> enc_info) {
+void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password) {
     if (enc_info.size() < sizeof(encryption_info))
         throw formatted_error("EncryptionInfo was {} bytes, expected at least {}", enc_info.size(), sizeof(encryption_info));
 
@@ -406,12 +408,41 @@ static void parse_enc_info(span<const uint8_t> enc_info) {
 
     auto encrypted_verifier_hash = sp.subspan(0, 32);
 
-    check_password(u"password", salt, encrypted_verifier, encrypted_verifier_hash);
+    check_password(password, salt, encrypted_verifier, encrypted_verifier_hash); // throws if wrong
+
+    memcpy(this->salt.data(), salt.data(), this->salt.size());
+}
+
+void cfbf::decrypt(span<uint8_t> enc_package) {
+    if (enc_package.size() < sizeof(uint64_t))
+        throw formatted_error("EncryptedPackage was {} bytes, expected at least {}", enc_package.size(), sizeof(uint64_t));
+
+    auto size = *(uint64_t*)enc_package.data();
+
+    enc_package = enc_package.subspan(sizeof(uint64_t));
+
+    if (enc_package.size() < size)
+        throw formatted_error("EncryptedPackage was {} bytes, expected at least {}", enc_package.size() + sizeof(uint64_t), size + sizeof(uint64_t));
+
+    AES_ctx ctx;
+    auto buf = enc_package;
+
+    AES_init_ctx(&ctx, key.data());
+
+    while (!buf.empty()) {
+        AES_ECB_decrypt(&ctx, buf.data());
+
+        buf = buf.subspan(16);
+    }
+
+    ofstream f("plaintext");
+
+    f.write((char*)enc_package.data(), enc_package.size()); // FIXME - throw exception if fails
 }
 
 static void cfbf_test(const filesystem::path& fn) {
     cfbf c(fn);
-    string enc_info;
+    string enc_info, enc_package;
 
     for (unsigned int num = 0; const auto& e : c.entries) {
         fmt::print("{}\n", e.name);
@@ -447,6 +478,20 @@ static void cfbf_test(const filesystem::path& fn) {
 
                 off += size;
             }
+        } else if (e.name == "/EncryptedPackage") {
+            enc_package.resize(e.de.size);
+
+            uint64_t off = 0;
+            auto buf = span((std::byte*)enc_package.data(), enc_package.size());
+
+            while (true) {
+                auto size = e.read(buf, off);
+
+                if (size == 0)
+                    break;
+
+                off += size;
+            }
         }
 
         ofstream f("file" + to_string(num));
@@ -471,7 +516,8 @@ static void cfbf_test(const filesystem::path& fn) {
     if (enc_info.empty())
         throw runtime_error("EncryptionInfo not found.");
 
-    parse_enc_info(span((uint8_t*)enc_info.data(), enc_info.size()));
+    c.parse_enc_info(span((uint8_t*)enc_info.data(), enc_info.size()), u"password");
+    c.decrypt(span((uint8_t*)enc_package.data(), enc_package.size()));
 }
 
 static void test_sha1() {

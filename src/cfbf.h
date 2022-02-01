@@ -44,12 +44,19 @@ public:
     cfbf(const std::filesystem::path& fn);
     uint32_t next_sector(uint32_t sector) const;
     uint32_t next_mini_sector(uint32_t sector) const;
+    void parse_enc_info(std::span<const uint8_t> enc_info, std::u16string_view password);
+    void decrypt(std::span<uint8_t> enc_package);
 
     std::vector<cfbf_entry> entries;
     std::span<const std::byte> s;
 
 private:
     void add_entry(std::string_view path, uint32_t num);
+    void check_password(std::u16string_view password, std::span<const uint8_t> salt,
+                        std::span<const uint8_t> encrypted_verifier,
+                        std::span<const uint8_t> encrypted_verifier_hash);
 
     std::unique_ptr<mmap> m;
+    std::array<uint8_t, 16> key;
+    std::array<uint8_t, 16> salt;
 };
