@@ -52,7 +52,7 @@ using namespace std;
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
 
-void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
+static void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 {
 	uint32_t a, b, c, d, e;
 	typedef union {
@@ -110,99 +110,77 @@ void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 #endif
 }
 
-
 /* SHA1Init - Initialize new context */
 
-void SHA1Init(SHA1_CTX* context)
-{
+constexpr SHA1_CTX::SHA1_CTX() {
 	/* SHA1 initialization constants */
-	context->state[0] = 0x67452301;
-	context->state[1] = 0xEFCDAB89;
-	context->state[2] = 0x98BADCFE;
-	context->state[3] = 0x10325476;
-	context->state[4] = 0xC3D2E1F0;
-	context->count[0] = context->count[1] = 0;
-}
+	state[0] = 0x67452301;
+	state[1] = 0xEFCDAB89;
+	state[2] = 0x98BADCFE;
+	state[3] = 0x10325476;
+	state[4] = 0xC3D2E1F0;
+	count[0] = count[1] = 0;
 
+    for (unsigned int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = 0;
+    }
+}
 
 /* Run your data through this. */
 
-void SHA1Update(SHA1_CTX* context, uint8_t* data, uint32_t len)
-{
+constexpr void SHA1_CTX::update(std::span<const uint8_t> data) {
 	uint32_t i;
 	uint32_t j;
 
-	j = context->count[0];
-	if ((context->count[0] += len << 3) < j)
-		context->count[1]++;
-	context->count[1] += (len>>29);
+	j = count[0];
+	if ((count[0] += data.size() << 3) < j)
+		count[1]++;
+	count[1] += (data.size()>>29);
 	j = (j >> 3) & 63;
-	if ((j + len) > 63) {
-		memcpy(&context->buffer[j], data, (i = 64-j));
-		SHA1Transform(context->state, context->buffer);
-		for ( ; i + 63 < len; i += 64) {
-			SHA1Transform(context->state, &data[i]);
+	if ((j + data.size()) > 63) {
+		memcpy(&buffer[j], data.data(), (i = 64-j));
+		SHA1Transform(state, buffer);
+		for ( ; i + 63 < data.size(); i += 64) {
+			SHA1Transform(state, (uint8_t*)&data[i]);
 		}
 		j = 0;
 	}
 	else i = 0;
-	memcpy(&context->buffer[j], &data[i], len - i);
+	memcpy(&buffer[j], &data[i], data.size() - i);
 }
 
 
 /* Add padding and return the message digest. */
 
-void SHA1Final(unsigned char digest[20], SHA1_CTX* context)
-{
+constexpr void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
 	unsigned i;
 	unsigned char finalcount[8];
 	unsigned char c;
 
-#if 0   /* untested "improvement" by DHR */
-	/* Convert context->count to a sequence of bytes
-	* in finalcount.  Second element first, but
-	* big-endian order within element.
-	* But we do it all backwards.
-	*/
-	unsigned char *fcp = &finalcount[8];
-
-	for (i = 0; i < 2; i++)
-	{
-		uint32_t t = context->count[i];
-		int j;
-
-		for (j = 0; j < 4; t >>= 8, j++)
-			*--fcp = (unsigned char) t;
-	}
-#else
 	for (i = 0; i < 8; i++) {
-		finalcount[i] = (unsigned char)((context->count[(i >= 4 ? 0 : 1)]
+		finalcount[i] = (unsigned char)((count[(i >= 4 ? 0 : 1)]
 			>> ((3-(i & 3)) * 8) ) & 255);  /* Endian independent */
 	}
-#endif
+
 	c = 0200;
-	SHA1Update(context, &c, 1);
-	while ((context->count[0] & 504) != 448) {
+	update(span(&c, 1));
+	while ((count[0] & 504) != 448) {
 		c = 0000;
-		SHA1Update(context, &c, 1);
+		update(span(&c, 1));
 	}
-	SHA1Update(context, finalcount, 8);  /* Should cause a SHA1Transform() */
+	update(span(finalcount, 8));  /* Should cause a SHA1Transform() */
 	for (i = 0; i < 20; i++) {
 		digest[i] = (unsigned char)
-			((context->state[i>>2] >> ((3-(i & 3)) * 8) ) & 255);
+			((state[i>>2] >> ((3-(i & 3)) * 8) ) & 255);
 	}
-	/* Wipe variables */
-	memset(context, '\0', sizeof(*context));
-	memset(&finalcount, '\0', sizeof(finalcount));
 }
 
-string sha1(const string& s) {
-	unsigned char digest[20];
+constexpr array<uint8_t, 20> sha1(span<const uint8_t> s) {
+	array<uint8_t, 20> digest;
 	SHA1_CTX ctx;
 
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, (uint8_t*)s.c_str(), (uint32_t)s.length());
-	SHA1Final(digest, &ctx);
+	ctx.update(s);
+	ctx.finalize(digest);
 
-	return string((char*)digest, 20);
+	return digest;
 }
