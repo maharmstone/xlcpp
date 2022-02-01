@@ -65,7 +65,18 @@ constexpr void R2(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
     w = rotl(w, 30);
 }
 
-#define R3(v,w,x,y,z,i,l) z+=(((w|x)&y)|(w&x))+blk(i,l)+0x8F1BBCDC+rotl(v,5);w=rotl(w,30);
+constexpr void R3(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t i, uint32_t* l) {
+    z += ((w | x) & y) | (w & x);
+
+    l[i&15] = rotl(l[(i+13)&15] ^ l[(i+8)&15] ^ l[(i+2)&15] ^ l[i&15], 1);
+    z += l[i&15];
+
+    z += 0x8f1bbcdc;
+    z += rotl(v, 5);
+
+    w = rotl(w, 30);
+}
+
 #define R4(v,w,x,y,z,i,l) z+=(w^x^y)+blk(i,l)+0xCA62C1D6+rotl(v,5);w=rotl(w,30);
 
 
