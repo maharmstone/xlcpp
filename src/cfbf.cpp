@@ -91,49 +91,62 @@ static void print_dirent(span<const std::byte> dirents, uint32_t num, string_vie
         print_dirent(dirents, de.sid_right_sibling, prefix);
 }
 
-static void cfbf_test(const filesystem::path& fn) {
-    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
+class cfbf {
+public:
+    cfbf(const filesystem::path& fn) {
+        unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
-    mmap m(hup.get());
+        m = make_unique<mmap>(hup.get());
 
-    auto s = m.map();
+        s = m->map();
 
-    auto& ssh = *(structured_storage_header*)s.data();
+        auto& ssh = *(structured_storage_header*)s.data();
 
-    if (ssh.sig != CFBF_SIGNATURE)
-        throw runtime_error("Incorrect signature.");
+        if (ssh.sig != CFBF_SIGNATURE)
+            throw runtime_error("Incorrect signature.");
 
-    fmt::print("sig = {:016x}\n", ssh.sig);
-    fmt::print("clsid = {:x}\n", *(uint64_t*)ssh.clsid);
-    fmt::print("minor_version = {:x}\n", ssh.minor_version);
-    fmt::print("major_version = {:x}\n", ssh.major_version);
-    fmt::print("byte_order = {:x}\n", ssh.byte_order);
-    fmt::print("sector_shift = {:x}\n", ssh.sector_shift);
-    fmt::print("mini_sector_shift = {:x}\n", ssh.mini_sector_shift);
-    fmt::print("reserved1 = {:x}\n", ssh.reserved1);
-    fmt::print("reserved2 = {:x}\n", ssh.reserved2);
-    fmt::print("num_sect_dir = {:x}\n", ssh.num_sect_dir);
-    fmt::print("num_sect_fat = {:x}\n", ssh.num_sect_fat);
-    fmt::print("sect_dir_start = {:x}\n", ssh.sect_dir_start);
-    fmt::print("transaction_signature = {:x}\n", ssh.transaction_signature);
-    fmt::print("mini_sector_cutoff = {:x}\n", ssh.mini_sector_cutoff);
-    fmt::print("mini_fat_start = {:x}\n", ssh.mini_fat_start);
-    fmt::print("num_sect_mini_fat = {:x}\n", ssh.num_sect_mini_fat);
-    fmt::print("sect_dif_start = {:x}\n", ssh.sect_dif_start);
-    fmt::print("num_sect_dif = {:x}\n", ssh.num_sect_dif);
+        fmt::print("sig = {:016x}\n", ssh.sig);
+        fmt::print("clsid = {:x}\n", *(uint64_t*)ssh.clsid);
+        fmt::print("minor_version = {:x}\n", ssh.minor_version);
+        fmt::print("major_version = {:x}\n", ssh.major_version);
+        fmt::print("byte_order = {:x}\n", ssh.byte_order);
+        fmt::print("sector_shift = {:x}\n", ssh.sector_shift);
+        fmt::print("mini_sector_shift = {:x}\n", ssh.mini_sector_shift);
+        fmt::print("reserved1 = {:x}\n", ssh.reserved1);
+        fmt::print("reserved2 = {:x}\n", ssh.reserved2);
+        fmt::print("num_sect_dir = {:x}\n", ssh.num_sect_dir);
+        fmt::print("num_sect_fat = {:x}\n", ssh.num_sect_fat);
+        fmt::print("sect_dir_start = {:x}\n", ssh.sect_dir_start);
+        fmt::print("transaction_signature = {:x}\n", ssh.transaction_signature);
+        fmt::print("mini_sector_cutoff = {:x}\n", ssh.mini_sector_cutoff);
+        fmt::print("mini_fat_start = {:x}\n", ssh.mini_fat_start);
+        fmt::print("num_sect_mini_fat = {:x}\n", ssh.num_sect_mini_fat);
+        fmt::print("sect_dif_start = {:x}\n", ssh.sect_dif_start);
+        fmt::print("num_sect_dif = {:x}\n", ssh.num_sect_dif);
 
-    for (unsigned int i = 0; i < ssh.num_sect_dif; i++) {
-        fmt::print("sect_dif = {:x}\n", ssh.sect_dif[i]);
+        for (unsigned int i = 0; i < ssh.num_sect_dif; i++) {
+            fmt::print("sect_dif = {:x}\n", ssh.sect_dif[i]);
+        }
+
+        fmt::print("---\n");
+
+        auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+
+        if (de.type != obj_type::STGTY_ROOT)
+            throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
+
+        print_dirent(s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift)), 0, "");
     }
 
-    fmt::print("---\n");
+private:
+    unique_ptr<mmap> m;
+    span<const std::byte> s;
+};
 
-    auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+static void cfbf_test(const filesystem::path& fn) {
+    cfbf c(fn);
 
-    if (de.type != obj_type::STGTY_ROOT)
-        throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
-
-    print_dirent(s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift)), 0, "");
+    // FIXME
 }
 
 int main() {
