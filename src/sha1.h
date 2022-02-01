@@ -19,4 +19,4 @@ struct SHA1_CTX {
     unsigned char buffer[64];
 };
 
-constexpr std::array<uint8_t, 20> sha1(std::span<const std::byte> s);
+std::array<uint8_t, 20> sha1(std::span<const uint8_t> s);

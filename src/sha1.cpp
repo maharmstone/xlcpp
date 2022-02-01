@@ -20,25 +20,18 @@ A million repetitions of "a"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <bit>
 
 #include "sha1.h"
 
 using namespace std;
 
-//#include <endian.h>
-
 #define rol(value, bits) (((value) << (bits)) | ((value) >> (32 - (bits))))
 
 /* blk0() and blk() perform the initial expand. */
 /* I got the idea of expanding during the round function from SSLeay */
-#if BYTE_ORDER == LITTLE_ENDIAN
 #define blk0(i) (block->l[i] = (rol(block->l[i],24)&0xFF00FF00) \
     |(rol(block->l[i],8)&0x00FF00FF))
-#elif BYTE_ORDER == BIG_ENDIAN
-#define blk0(i) block->l[i]
-#else
-#error "Endianness not defined!"
-#endif
 #define blk(i) (block->l[i&15] = rol(block->l[(i+13)&15]^block->l[(i+8)&15] \
     ^block->l[(i+2)&15]^block->l[i&15],1))
 
@@ -52,24 +45,16 @@ using namespace std;
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
 
-static void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
+constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 {
 	uint32_t a, b, c, d, e;
-	typedef union {
-		unsigned char c[64];
+	union CHAR64LONG16 {
 		uint32_t l[16];
-	} CHAR64LONG16;
-#ifdef SHA1HANDSOFF
+	};
+
 	CHAR64LONG16 block[1];  /* use array to appear as a pointer */
 	memcpy(block, buffer, 64);
-#else
-	/* The following had better never be used because it causes the
-	* pointer-to-const buffer to be cast into a pointer to non-const.
-	* And the result is written through.  I threw a "const" in, hoping
-	* this will cause a diagnostic.
-	*/
-	CHAR64LONG16* block = (const CHAR64LONG16*)buffer;
-#endif
+
 	/* Copy context->state[] to working vars */
 	a = state[0];
 	b = state[1];
@@ -103,11 +88,6 @@ static void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 	state[2] += c;
 	state[3] += d;
 	state[4] += e;
-	/* Wipe variables */
-	a = b = c = d = e = 0;
-#ifdef SHA1HANDSOFF
-	memset(block, '\0', sizeof(block));
-#endif
 }
 
 /* SHA1Init - Initialize new context */
@@ -138,7 +118,8 @@ constexpr void SHA1_CTX::update(std::span<const uint8_t> data) {
 	count[1] += (data.size()>>29);
 	j = (j >> 3) & 63;
 	if ((j + data.size()) > 63) {
-		memcpy(&buffer[j], data.data(), (i = 64-j));
+        i = 64 - j;
+		memcpy(&buffer[j], data.data(), i);
 		SHA1Transform(state, buffer);
 		for ( ; i + 63 < data.size(); i += 64) {
 			SHA1Transform(state, (uint8_t*)&data[i]);
@@ -175,7 +156,7 @@ constexpr void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
 	}
 }
 
-constexpr array<uint8_t, 20> sha1(span<const uint8_t> s) {
+array<uint8_t, 20> sha1(span<const uint8_t> s) {
 	array<uint8_t, 20> digest;
 	SHA1_CTX ctx;
 
@@ -184,3 +165,5 @@ constexpr array<uint8_t, 20> sha1(span<const uint8_t> s) {
 
 	return digest;
 }
+
+// static_assert(sha1(span<uint8_t>()).size() == 20);

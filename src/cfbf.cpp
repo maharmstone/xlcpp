@@ -2,6 +2,7 @@
 #include <fstream>
 #include "cfbf.h"
 #include "utf16.h"
+#include "sha1.h"
 
 using namespace std;
 
@@ -252,6 +253,13 @@ static void cfbf_test(const filesystem::path& fn) {
 }
 
 int main() {
+    auto hash = sha1(span<uint8_t>());
+
+    for (auto c : hash) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+
     try {
         cfbf_test("../password.xlsx");
     } catch (const exception& e) {
