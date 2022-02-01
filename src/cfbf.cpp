@@ -252,13 +252,25 @@ static void cfbf_test(const filesystem::path& fn) {
     }
 }
 
-int main() {
+static void test_sha1() {
     auto hash = sha1(span<uint8_t>());
 
     for (auto c : hash) {
         fmt::print("{:02x} ", c);
     }
     fmt::print("\n");
+
+    auto sv = string_view("abc");
+    hash = sha1(span((uint8_t*)sv.data(), sv.size()));
+
+    for (auto c : hash) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+}
+
+int main() {
+    test_sha1();
 
     try {
         cfbf_test("../password.xlsx");
