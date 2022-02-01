@@ -26,8 +26,8 @@ A million repetitions of "a"
 
 using namespace std;
 
-#define blk(i) (block->l[i&15] = rotl(block->l[(i+13)&15]^block->l[(i+8)&15] \
-    ^block->l[(i+2)&15]^block->l[i&15],1))
+#define blk(i,l) (l[i&15] = rotl(l[(i+13)&15]^l[(i+8)&15] \
+    ^l[(i+2)&15]^l[i&15],1))
 
 constexpr void R0(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t& bl) {
     z += (w & (x^y)) ^ y;
@@ -38,7 +38,7 @@ constexpr void R0(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
     z += 0x5a827999;
     z += rotl(v, 5);
 
-    w = rotl(w,30);
+    w = rotl(w, 30);
 }
 
 constexpr void R1(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t i, uint32_t* l) {
@@ -48,14 +48,25 @@ constexpr void R1(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
     z += l[i&15];
 
     z += 0x5a827999;
-    z += rotl(v,5);
+    z += rotl(v, 5);
 
-    w = rotl(w,30);
+    w = rotl(w, 30);
 }
 
-#define R2(v,w,x,y,z,i) z+=(w^x^y)+blk(i)+0x6ED9EBA1+rotl(v,5);w=rotl(w,30);
-#define R3(v,w,x,y,z,i) z+=(((w|x)&y)|(w&x))+blk(i)+0x8F1BBCDC+rotl(v,5);w=rotl(w,30);
-#define R4(v,w,x,y,z,i) z+=(w^x^y)+blk(i)+0xCA62C1D6+rotl(v,5);w=rotl(w,30);
+constexpr void R2(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t i, uint32_t* l) {
+    z += w ^ x ^ y;
+
+    l[i&15] = rotl(l[(i+13)&15] ^ l[(i+8)&15] ^ l[(i+2)&15] ^ l[i&15], 1);
+    z += l[i&15];
+
+    z += 0x6ed9eba1;
+    z += rotl(v, 5);
+
+    w = rotl(w, 30);
+}
+
+#define R3(v,w,x,y,z,i,l) z+=(((w|x)&y)|(w&x))+blk(i,l)+0x8F1BBCDC+rotl(v,5);w=rotl(w,30);
+#define R4(v,w,x,y,z,i,l) z+=(w^x^y)+blk(i,l)+0xCA62C1D6+rotl(v,5);w=rotl(w,30);
 
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
@@ -100,21 +111,68 @@ constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
     R1(c,d,e,a,b, 18, block->l);
     R1(b,c,d,e,a, 19, block->l);
 
-    R2(a,b,c,d,e,20); R2(e,a,b,c,d,21); R2(d,e,a,b,c,22); R2(c,d,e,a,b,23);
-    R2(b,c,d,e,a,24); R2(a,b,c,d,e,25); R2(e,a,b,c,d,26); R2(d,e,a,b,c,27);
-    R2(c,d,e,a,b,28); R2(b,c,d,e,a,29); R2(a,b,c,d,e,30); R2(e,a,b,c,d,31);
-    R2(d,e,a,b,c,32); R2(c,d,e,a,b,33); R2(b,c,d,e,a,34); R2(a,b,c,d,e,35);
-    R2(e,a,b,c,d,36); R2(d,e,a,b,c,37); R2(c,d,e,a,b,38); R2(b,c,d,e,a,39);
-    R3(a,b,c,d,e,40); R3(e,a,b,c,d,41); R3(d,e,a,b,c,42); R3(c,d,e,a,b,43);
-    R3(b,c,d,e,a,44); R3(a,b,c,d,e,45); R3(e,a,b,c,d,46); R3(d,e,a,b,c,47);
-    R3(c,d,e,a,b,48); R3(b,c,d,e,a,49); R3(a,b,c,d,e,50); R3(e,a,b,c,d,51);
-    R3(d,e,a,b,c,52); R3(c,d,e,a,b,53); R3(b,c,d,e,a,54); R3(a,b,c,d,e,55);
-    R3(e,a,b,c,d,56); R3(d,e,a,b,c,57); R3(c,d,e,a,b,58); R3(b,c,d,e,a,59);
-    R4(a,b,c,d,e,60); R4(e,a,b,c,d,61); R4(d,e,a,b,c,62); R4(c,d,e,a,b,63);
-    R4(b,c,d,e,a,64); R4(a,b,c,d,e,65); R4(e,a,b,c,d,66); R4(d,e,a,b,c,67);
-    R4(c,d,e,a,b,68); R4(b,c,d,e,a,69); R4(a,b,c,d,e,70); R4(e,a,b,c,d,71);
-    R4(d,e,a,b,c,72); R4(c,d,e,a,b,73); R4(b,c,d,e,a,74); R4(a,b,c,d,e,75);
-    R4(e,a,b,c,d,76); R4(d,e,a,b,c,77); R4(c,d,e,a,b,78); R4(b,c,d,e,a,79);
+    R2(a,b,c,d,e,20, block->l);
+    R2(e,a,b,c,d,21, block->l);
+    R2(d,e,a,b,c,22, block->l);
+    R2(c,d,e,a,b,23, block->l);
+    R2(b,c,d,e,a,24, block->l);
+    R2(a,b,c,d,e,25, block->l);
+    R2(e,a,b,c,d,26, block->l);
+    R2(d,e,a,b,c,27, block->l);
+    R2(c,d,e,a,b,28, block->l);
+    R2(b,c,d,e,a,29, block->l);
+    R2(a,b,c,d,e,30, block->l);
+    R2(e,a,b,c,d,31, block->l);
+    R2(d,e,a,b,c,32, block->l);
+    R2(c,d,e,a,b,33, block->l);
+    R2(b,c,d,e,a,34, block->l);
+    R2(a,b,c,d,e,35, block->l);
+    R2(e,a,b,c,d,36, block->l);
+    R2(d,e,a,b,c,37, block->l);
+    R2(c,d,e,a,b,38, block->l);
+    R2(b,c,d,e,a,39, block->l);
+
+    R3(a,b,c,d,e,40, block->l);
+    R3(e,a,b,c,d,41, block->l);
+    R3(d,e,a,b,c,42, block->l);
+    R3(c,d,e,a,b,43, block->l);
+    R3(b,c,d,e,a,44, block->l);
+    R3(a,b,c,d,e,45, block->l);
+    R3(e,a,b,c,d,46, block->l);
+    R3(d,e,a,b,c,47, block->l);
+    R3(c,d,e,a,b,48, block->l);
+    R3(b,c,d,e,a,49, block->l);
+    R3(a,b,c,d,e,50, block->l);
+    R3(e,a,b,c,d,51, block->l);
+    R3(d,e,a,b,c,52, block->l);
+    R3(c,d,e,a,b,53, block->l);
+    R3(b,c,d,e,a,54, block->l);
+    R3(a,b,c,d,e,55, block->l);
+    R3(e,a,b,c,d,56, block->l);
+    R3(d,e,a,b,c,57, block->l);
+    R3(c,d,e,a,b,58, block->l);
+    R3(b,c,d,e,a,59, block->l);
+
+    R4(a,b,c,d,e,60, block->l);
+    R4(e,a,b,c,d,61, block->l);
+    R4(d,e,a,b,c,62, block->l);
+    R4(c,d,e,a,b,63, block->l);
+    R4(b,c,d,e,a,64, block->l);
+    R4(a,b,c,d,e,65, block->l);
+    R4(e,a,b,c,d,66, block->l);
+    R4(d,e,a,b,c,67, block->l);
+    R4(c,d,e,a,b,68, block->l);
+    R4(b,c,d,e,a,69, block->l);
+    R4(a,b,c,d,e,70, block->l);
+    R4(e,a,b,c,d,71, block->l);
+    R4(d,e,a,b,c,72, block->l);
+    R4(c,d,e,a,b,73, block->l);
+    R4(b,c,d,e,a,74, block->l);
+    R4(a,b,c,d,e,75, block->l);
+    R4(e,a,b,c,d,76, block->l);
+    R4(d,e,a,b,c,77, block->l);
+    R4(c,d,e,a,b,78, block->l);
+    R4(b,c,d,e,a,79, block->l);
     /* Add the working vars back into context.state[] */
     state[0] += a;
     state[1] += b;
