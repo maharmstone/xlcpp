@@ -209,76 +209,7 @@ size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
     return read;
 }
 
-static void cfbf_test(const filesystem::path& fn) {
-    cfbf c(fn);
-
-    for (unsigned int num = 0; const auto& e : c.entries) {
-        fmt::print("{}\n", e.name);
-        fmt::print("  type = {:x}\n", (unsigned int)e.de.type);
-        fmt::print("  colour = {:x}\n", (unsigned int)e.de.colour);
-        fmt::print("  sid_left_sibling = {:x}\n", e.de.sid_left_sibling);
-        fmt::print("  sid_right_sibling = {:x}\n", e.de.sid_right_sibling);
-        fmt::print("  sid_child = {:x}\n", e.de.sid_child);
-        fmt::print("  clsid = {:x}\n", *(uint64_t*)e.de.clsid);
-        fmt::print("  user_flags = {:x}\n", e.de.user_flags);
-        fmt::print("  create_time = {:x}\n", e.de.create_time);
-        fmt::print("  modify_time = {:x}\n", e.de.modify_time);
-        fmt::print("  sect_start = {:x}\n", e.de.sect_start);
-        fmt::print("  size = {:x}\n", e.de.size);
-        fmt::print("--\n");
-
-        if (num == 0) { // root
-            num++;
-            continue;
-        }
-
-        ofstream f("file" + to_string(num));
-
-        uint64_t off = 0;
-        std::byte buf[4096];
-
-        while (true) {
-            auto size = e.read(buf, off);
-
-            if (size == 0)
-                break;
-
-            f.write((char*)buf, size); // FIXME - throw exception if fails
-
-            off += size;
-        }
-
-        num++;
-    }
-}
-
-static void test_sha1() {
-    auto hash = sha1(span<uint8_t>());
-
-    for (auto c : hash) {
-        fmt::print("{:02x} ", c);
-    }
-    fmt::print("\n");
-
-    auto sv = string_view("abc");
-
-    {
-        SHA1_CTX ctx;
-
-        for (auto c : sv) {
-            ctx.update(span((uint8_t*)&c, 1));
-        }
-
-        ctx.finalize(hash);
-    }
-
-    for (auto c : hash) {
-        fmt::print("{:02x} ", c);
-    }
-    fmt::print("\n");
-}
-
-array<uint8_t, 16> generate_key(u16string_view password, const array<uint8_t, 16>& salt) {
+static array<uint8_t, 16> generate_key(u16string_view password, const array<uint8_t, 16>& salt) {
     array<uint8_t, 20> h;
 
     {
@@ -336,6 +267,165 @@ array<uint8_t, 16> generate_key(u16string_view password, const array<uint8_t, 16
     memcpy(ret.data(), x1.data(), ret.size());
 
     return ret;
+}
+
+#pragma pack(push, 1)
+
+struct encryption_info {
+    uint16_t major;
+    uint16_t minor;
+    uint32_t flags;
+    uint32_t header_size;
+};
+
+struct encryption_header {
+    uint32_t flags;
+    uint32_t size_extra;
+    uint32_t alg_id;
+    uint32_t alg_id_hash;
+    uint32_t key_size;
+    uint32_t provider_type;
+    uint32_t reserved1;
+    uint32_t reserved2;
+    char16_t csp_name[0];
+};
+
+#pragma pack(pop)
+
+static const uint32_t ALG_ID_AES_128 = 0x660e;
+static const uint32_t ALG_ID_SHA_1 = 0x8004;
+
+static void parse_enc_info(span<const uint8_t> enc_info) {
+    if (enc_info.size() < sizeof(encryption_info))
+        throw formatted_error("EncryptionInfo was {} bytes, expected at least {}", enc_info.size(), sizeof(encryption_info));
+
+    auto& ei = *(encryption_info*)enc_info.data();
+
+    if (ei.major != 3 || ei.minor != 2)
+        throw formatted_error("Unsupported EncryptionInfo version {}.{}", ei.major, ei.minor);
+
+    if (ei.flags != 0x24) // AES
+        throw formatted_error("Unsupported EncryptionInfo flags {:x}", ei.flags);
+
+    fmt::print("major = {:x}\n", ei.major);
+    fmt::print("minor = {:x}\n", ei.minor);
+    fmt::print("flags = {:x}\n", ei.flags);
+    fmt::print("header_size = {:x}\n", ei.header_size);
+
+    if (ei.header_size < offsetof(encryption_header, csp_name))
+        throw formatted_error("Encryption header was {} bytes, expected at least {}", ei.header_size, offsetof(encryption_header, csp_name));
+
+    if (ei.header_size > enc_info.size() - sizeof(encryption_info))
+        throw formatted_error("Encryption header was {} bytes, but only {} remaining", ei.header_size, enc_info.size() - sizeof(encryption_info));
+
+    auto& h = *(encryption_header*)(enc_info.data() + sizeof(encryption_info));
+
+    fmt::print("flags = {:x}\n", h.flags);
+    fmt::print("size_extra = {:x}\n", h.size_extra);
+    fmt::print("alg_id = {:x}\n", h.alg_id);
+    fmt::print("alg_id_hash = {:x}\n", h.alg_id_hash);
+    fmt::print("key_size = {:x}\n", h.key_size);
+    fmt::print("provider_type = {:x}\n", h.provider_type);
+
+    if (h.alg_id != ALG_ID_AES_128)
+        throw formatted_error("Unsupported algorithm ID {:x}", h.alg_id);
+
+    if (h.alg_id_hash != ALG_ID_SHA_1 && h.alg_id_hash != 0)
+        throw formatted_error("Unsupported hash algorithm ID {:x}", h.alg_id_hash);
+
+    if (h.key_size != 128)
+        throw formatted_error("Key size was {}, expected 128", h.key_size);
+}
+
+static void cfbf_test(const filesystem::path& fn) {
+    cfbf c(fn);
+    string enc_info;
+
+    for (unsigned int num = 0; const auto& e : c.entries) {
+        fmt::print("{}\n", e.name);
+        fmt::print("  type = {:x}\n", (unsigned int)e.de.type);
+        fmt::print("  colour = {:x}\n", (unsigned int)e.de.colour);
+        fmt::print("  sid_left_sibling = {:x}\n", e.de.sid_left_sibling);
+        fmt::print("  sid_right_sibling = {:x}\n", e.de.sid_right_sibling);
+        fmt::print("  sid_child = {:x}\n", e.de.sid_child);
+        fmt::print("  clsid = {:x}\n", *(uint64_t*)e.de.clsid);
+        fmt::print("  user_flags = {:x}\n", e.de.user_flags);
+        fmt::print("  create_time = {:x}\n", e.de.create_time);
+        fmt::print("  modify_time = {:x}\n", e.de.modify_time);
+        fmt::print("  sect_start = {:x}\n", e.de.sect_start);
+        fmt::print("  size = {:x}\n", e.de.size);
+        fmt::print("--\n");
+
+        if (num == 0) { // root
+            num++;
+            continue;
+        }
+
+        if (e.name == "/EncryptionInfo") {
+            enc_info.resize(e.de.size);
+
+            uint64_t off = 0;
+            auto buf = span((std::byte*)enc_info.data(), enc_info.size());
+
+            while (true) {
+                auto size = e.read(buf, off);
+
+                if (size == 0)
+                    break;
+
+                off += size;
+            }
+        }
+
+        ofstream f("file" + to_string(num));
+
+        uint64_t off = 0;
+        std::byte buf[4096];
+
+        while (true) {
+            auto size = e.read(buf, off);
+
+            if (size == 0)
+                break;
+
+            f.write((char*)buf, size); // FIXME - throw exception if fails
+
+            off += size;
+        }
+
+        num++;
+    }
+
+    if (enc_info.empty())
+        throw runtime_error("EncryptionInfo not found.");
+
+    parse_enc_info(span((uint8_t*)enc_info.data(), enc_info.size()));
+}
+
+static void test_sha1() {
+    auto hash = sha1(span<uint8_t>());
+
+    for (auto c : hash) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+
+    auto sv = string_view("abc");
+
+    {
+        SHA1_CTX ctx;
+
+        for (auto c : sv) {
+            ctx.update(span((uint8_t*)&c, 1));
+        }
+
+        ctx.finalize(hash);
+    }
+
+    for (auto c : hash) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
 }
 
 static void test_key() {
