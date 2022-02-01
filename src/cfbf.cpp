@@ -3,6 +3,7 @@
 #include "cfbf.h"
 #include "utf16.h"
 #include "sha1.h"
+#include "aes.h"
 
 using namespace std;
 
@@ -209,7 +210,7 @@ size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
     return read;
 }
 
-static array<uint8_t, 16> generate_key(u16string_view password, const array<uint8_t, 16>& salt) {
+static array<uint8_t, 16> generate_key(u16string_view password, span<const uint8_t> salt) {
     array<uint8_t, 20> h;
 
     {
@@ -239,11 +240,6 @@ static array<uint8_t, 16> generate_key(u16string_view password, const array<uint
 
         ctx.finalize(h);
     }
-
-    for (auto c : h) {
-        fmt::print("{:02x} ", c);
-    }
-    fmt::print("\n");
 
     array<uint8_t, 64> buf1 = {
         0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
@@ -295,6 +291,49 @@ struct encryption_header {
 static const uint32_t ALG_ID_AES_128 = 0x660e;
 static const uint32_t ALG_ID_SHA_1 = 0x8004;
 
+static void check_password(u16string_view password, span<const uint8_t> salt,
+                           span<const uint8_t> encrypted_verifier,
+                           span<const uint8_t> encrypted_verifier_hash) {
+    auto key = generate_key(password, salt);
+    AES_ctx ctx;
+    array<uint8_t, 16> verifier;
+    array<uint8_t, 32> verifier_hash;
+
+    if (encrypted_verifier.size() != verifier.size())
+        throw formatted_error("encrypted_verifier.size() was {}, expected {}", encrypted_verifier.size(), verifier.size());
+
+    if (encrypted_verifier_hash.size() != verifier_hash.size())
+        throw formatted_error("encrypted_verifier_hash.size() was {}, expected {}", encrypted_verifier_hash.size(), verifier_hash.size());
+
+    AES_init_ctx(&ctx, key.data());
+
+    memcpy(verifier.data(), encrypted_verifier.data(), encrypted_verifier.size());
+
+    AES_ECB_decrypt(&ctx, verifier.data());
+
+    fmt::print("verifier = ");
+    for (auto c : verifier) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+
+    memcpy(verifier_hash.data(), encrypted_verifier_hash.data(), encrypted_verifier_hash.size());
+
+    AES_ECB_decrypt(&ctx, verifier_hash.data());
+    AES_ECB_decrypt(&ctx, verifier_hash.data() + 16);
+
+    fmt::print("verifier hash = ");
+    for (auto c : verifier_hash) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+
+    auto hash = sha1(verifier);
+
+    if (memcmp(hash.data(), verifier_hash.data(), hash.size()))
+        throw runtime_error("Incorrect password.");
+}
+
 static void parse_enc_info(span<const uint8_t> enc_info) {
     if (enc_info.size() < sizeof(encryption_info))
         throw formatted_error("EncryptionInfo was {} bytes, expected at least {}", enc_info.size(), sizeof(encryption_info));
@@ -335,6 +374,39 @@ static void parse_enc_info(span<const uint8_t> enc_info) {
 
     if (h.key_size != 128)
         throw formatted_error("Key size was {}, expected 128", h.key_size);
+
+    auto sp = enc_info.subspan(sizeof(encryption_info) + ei.header_size);
+
+    if (sp.size() < sizeof(uint32_t))
+        throw runtime_error("Malformed EncryptionInfo");
+
+    auto salt_size = *(uint32_t*)sp.data();
+    sp = sp.subspan(sizeof(uint32_t));
+
+    if (sp.size() < salt_size)
+        throw runtime_error("Malformed EncryptionInfo");
+
+    auto salt = sp.subspan(0, salt_size);
+    sp = sp.subspan(salt_size);
+
+    if (sp.size() < 16)
+        throw runtime_error("Malformed EncryptionInfo");
+
+    auto encrypted_verifier = sp.subspan(0, 16);
+    sp = sp.subspan(16);
+
+    if (sp.size() < sizeof(uint32_t))
+        throw runtime_error("Malformed EncryptionInfo");
+
+    // skip verifier_hash_size
+    sp = sp.subspan(sizeof(uint32_t));
+
+    if (sp.size() < 32)
+        throw runtime_error("Malformed EncryptionInfo");
+
+    auto encrypted_verifier_hash = sp.subspan(0, 32);
+
+    check_password(u"password", salt, encrypted_verifier, encrypted_verifier_hash);
 }
 
 static void cfbf_test(const filesystem::path& fn) {
