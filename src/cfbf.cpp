@@ -1,6 +1,5 @@
 #include <fmt/format.h>
-#include <filesystem>
-#include "mmap.h"
+#include "cfbf.h"
 #include "utf16.h"
 
 using namespace std;
@@ -68,85 +67,87 @@ struct dirent {
 
 static_assert(sizeof(dirent) == 0x80);
 
-static void print_dirent(span<const std::byte> dirents, uint32_t num, string_view prefix) {
-    auto& de = *(dirent*)(dirents.data() + (num * sizeof(dirent)));
+cfbf::cfbf(const filesystem::path& fn) {
+    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
-    fmt::print("{}{}\n", prefix, de.name_len >= sizeof(char16_t) ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "");
-    fmt::print("{}  type = {:x}\n", prefix, (unsigned int)de.type);
-    fmt::print("{}  colour = {:x}\n", prefix, (unsigned int)de.colour);
-    fmt::print("{}  sid_left_sibling = {:x}\n", prefix, de.sid_left_sibling);
-    fmt::print("{}  sid_right_sibling = {:x}\n", prefix, de.sid_right_sibling);
-    fmt::print("{}  sid_child = {:x}\n", prefix, de.sid_child);
-    fmt::print("{}  clsid = {:x}\n", prefix, *(uint64_t*)de.clsid);
-    fmt::print("{}  user_flags = {:x}\n", prefix, de.user_flags);
-    fmt::print("{}  create_time = {:x}\n", prefix, de.create_time);
-    fmt::print("{}  modify_time = {:x}\n", prefix, de.modify_time);
-    fmt::print("{}  sect_start = {:x}\n", prefix, de.sect_start);
-    fmt::print("{}  size = {:x}\n", prefix, de.size);
+    m = make_unique<mmap>(hup.get());
 
-    if (de.sid_child != NOSTREAM)
-        print_dirent(dirents, de.sid_child, string(prefix) + "    ");
+    s = m->map();
 
-    if (de.sid_right_sibling != NOSTREAM)
-        print_dirent(dirents, de.sid_right_sibling, prefix);
-}
+    auto& ssh = *(structured_storage_header*)s.data();
 
-class cfbf {
-public:
-    cfbf(const filesystem::path& fn) {
-        unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
+    if (ssh.sig != CFBF_SIGNATURE)
+        throw runtime_error("Incorrect signature.");
 
-        m = make_unique<mmap>(hup.get());
+    fmt::print("sig = {:016x}\n", ssh.sig);
+    fmt::print("clsid = {:x}\n", *(uint64_t*)ssh.clsid);
+    fmt::print("minor_version = {:x}\n", ssh.minor_version);
+    fmt::print("major_version = {:x}\n", ssh.major_version);
+    fmt::print("byte_order = {:x}\n", ssh.byte_order);
+    fmt::print("sector_shift = {:x}\n", ssh.sector_shift);
+    fmt::print("mini_sector_shift = {:x}\n", ssh.mini_sector_shift);
+    fmt::print("reserved1 = {:x}\n", ssh.reserved1);
+    fmt::print("reserved2 = {:x}\n", ssh.reserved2);
+    fmt::print("num_sect_dir = {:x}\n", ssh.num_sect_dir);
+    fmt::print("num_sect_fat = {:x}\n", ssh.num_sect_fat);
+    fmt::print("sect_dir_start = {:x}\n", ssh.sect_dir_start);
+    fmt::print("transaction_signature = {:x}\n", ssh.transaction_signature);
+    fmt::print("mini_sector_cutoff = {:x}\n", ssh.mini_sector_cutoff);
+    fmt::print("mini_fat_start = {:x}\n", ssh.mini_fat_start);
+    fmt::print("num_sect_mini_fat = {:x}\n", ssh.num_sect_mini_fat);
+    fmt::print("sect_dif_start = {:x}\n", ssh.sect_dif_start);
+    fmt::print("num_sect_dif = {:x}\n", ssh.num_sect_dif);
 
-        s = m->map();
-
-        auto& ssh = *(structured_storage_header*)s.data();
-
-        if (ssh.sig != CFBF_SIGNATURE)
-            throw runtime_error("Incorrect signature.");
-
-        fmt::print("sig = {:016x}\n", ssh.sig);
-        fmt::print("clsid = {:x}\n", *(uint64_t*)ssh.clsid);
-        fmt::print("minor_version = {:x}\n", ssh.minor_version);
-        fmt::print("major_version = {:x}\n", ssh.major_version);
-        fmt::print("byte_order = {:x}\n", ssh.byte_order);
-        fmt::print("sector_shift = {:x}\n", ssh.sector_shift);
-        fmt::print("mini_sector_shift = {:x}\n", ssh.mini_sector_shift);
-        fmt::print("reserved1 = {:x}\n", ssh.reserved1);
-        fmt::print("reserved2 = {:x}\n", ssh.reserved2);
-        fmt::print("num_sect_dir = {:x}\n", ssh.num_sect_dir);
-        fmt::print("num_sect_fat = {:x}\n", ssh.num_sect_fat);
-        fmt::print("sect_dir_start = {:x}\n", ssh.sect_dir_start);
-        fmt::print("transaction_signature = {:x}\n", ssh.transaction_signature);
-        fmt::print("mini_sector_cutoff = {:x}\n", ssh.mini_sector_cutoff);
-        fmt::print("mini_fat_start = {:x}\n", ssh.mini_fat_start);
-        fmt::print("num_sect_mini_fat = {:x}\n", ssh.num_sect_mini_fat);
-        fmt::print("sect_dif_start = {:x}\n", ssh.sect_dif_start);
-        fmt::print("num_sect_dif = {:x}\n", ssh.num_sect_dif);
-
-        for (unsigned int i = 0; i < ssh.num_sect_dif; i++) {
-            fmt::print("sect_dif = {:x}\n", ssh.sect_dif[i]);
-        }
-
-        fmt::print("---\n");
-
-        auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
-
-        if (de.type != obj_type::STGTY_ROOT)
-            throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
-
-        print_dirent(s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift)), 0, "");
+    for (unsigned int i = 0; i < ssh.num_sect_dif; i++) {
+        fmt::print("sect_dif = {:x}\n", ssh.sect_dif[i]);
     }
 
-private:
-    unique_ptr<mmap> m;
-    span<const std::byte> s;
-};
+    fmt::print("---\n");
+
+    auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+
+    if (de.type != obj_type::STGTY_ROOT)
+        throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
+
+    add_entry("", 0);
+}
+
+void cfbf::add_entry(string_view path, uint32_t num) {
+    auto& ssh = *(structured_storage_header*)s.data();
+    auto dirents = s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+    auto& de = *(dirent*)(dirents.data() + (num * sizeof(dirent)));
+    auto name = de.name_len >= sizeof(char16_t) && num != 0 ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "";
+
+    entries.emplace_back(*this, de, string(path) + name);
+
+    if (de.sid_child != NOSTREAM)
+        add_entry(name + "/", de.sid_child);
+
+    if (de.sid_right_sibling != NOSTREAM)
+        add_entry(path, de.sid_right_sibling);
+}
+
+cfbf_entry::cfbf_entry(cfbf& file, dirent& de, string_view name) : file(file), de(de), name(name) {
+}
 
 static void cfbf_test(const filesystem::path& fn) {
     cfbf c(fn);
 
-    // FIXME
+    for (const auto& e : c.entries) {
+        fmt::print("{}\n", e.name);
+        fmt::print("  type = {:x}\n", (unsigned int)e.de.type);
+        fmt::print("  colour = {:x}\n", (unsigned int)e.de.colour);
+        fmt::print("  sid_left_sibling = {:x}\n", e.de.sid_left_sibling);
+        fmt::print("  sid_right_sibling = {:x}\n", e.de.sid_right_sibling);
+        fmt::print("  sid_child = {:x}\n", e.de.sid_child);
+        fmt::print("  clsid = {:x}\n", *(uint64_t*)e.de.clsid);
+        fmt::print("  user_flags = {:x}\n", e.de.user_flags);
+        fmt::print("  create_time = {:x}\n", e.de.create_time);
+        fmt::print("  modify_time = {:x}\n", e.de.modify_time);
+        fmt::print("  sect_start = {:x}\n", e.de.sect_start);
+        fmt::print("  size = {:x}\n", e.de.size);
+        fmt::print("--\n");
+    }
 }
 
 int main() {
