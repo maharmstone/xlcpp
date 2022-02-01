@@ -37,10 +37,22 @@ constexpr void R0(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
 
     z += 0x5a827999;
     z += rotl(v, 5);
+
     w = rotl(w,30);
 }
 
-#define R1(v,w,x,y,z,i) z+=((w&(x^y))^y)+blk(i)+0x5A827999+rotl(v,5);w=rotl(w,30);
+constexpr void R1(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, uint32_t i, uint32_t* l) {
+    z += (w & (x ^ y)) ^ y;
+
+    l[i&15] = rotl(l[(i+13)&15] ^ l[(i+8)&15] ^ l[(i+2)&15] ^ l[i&15], 1);
+    z += l[i&15];
+
+    z += 0x5a827999;
+    z += rotl(v,5);
+
+    w = rotl(w,30);
+}
+
 #define R2(v,w,x,y,z,i) z+=(w^x^y)+blk(i)+0x6ED9EBA1+rotl(v,5);w=rotl(w,30);
 #define R3(v,w,x,y,z,i) z+=(((w|x)&y)|(w&x))+blk(i)+0x8F1BBCDC+rotl(v,5);w=rotl(w,30);
 #define R4(v,w,x,y,z,i) z+=(w^x^y)+blk(i)+0xCA62C1D6+rotl(v,5);w=rotl(w,30);
@@ -83,7 +95,11 @@ constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
     R0(b,c,d,e,a, block->l[14]);
     R0(a,b,c,d,e, block->l[15]);
 
-    R1(e,a,b,c,d,16); R1(d,e,a,b,c,17); R1(c,d,e,a,b,18); R1(b,c,d,e,a,19);
+    R1(e,a,b,c,d, 16, block->l);
+    R1(d,e,a,b,c, 17, block->l);
+    R1(c,d,e,a,b, 18, block->l);
+    R1(b,c,d,e,a, 19, block->l);
+
     R2(a,b,c,d,e,20); R2(e,a,b,c,d,21); R2(d,e,a,b,c,22); R2(c,d,e,a,b,23);
     R2(b,c,d,e,a,24); R2(a,b,c,d,e,25); R2(e,a,b,c,d,26); R2(d,e,a,b,c,27);
     R2(c,d,e,a,b,28); R2(b,c,d,e,a,29); R2(a,b,c,d,e,30); R2(e,a,b,c,d,31);
