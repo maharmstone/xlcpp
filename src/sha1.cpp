@@ -196,25 +196,9 @@ constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
     state[4] += e;
 }
 
-/* SHA1Init - Initialize new context */
-
-constexpr SHA1_CTX::SHA1_CTX() {
-	/* SHA1 initialization constants */
-	state[0] = 0x67452301;
-	state[1] = 0xEFCDAB89;
-	state[2] = 0x98BADCFE;
-	state[3] = 0x10325476;
-	state[4] = 0xC3D2E1F0;
-	count[0] = count[1] = 0;
-
-    for (unsigned int i = 0; i < sizeof(buffer); i++) {
-        buffer[i] = 0;
-    }
-}
-
 /* Run your data through this. */
 
-constexpr void SHA1_CTX::update(std::span<const uint8_t> data) {
+void SHA1_CTX::update(std::span<const uint8_t> data) {
 	uint32_t i;
 	uint32_t j;
 
@@ -239,7 +223,7 @@ constexpr void SHA1_CTX::update(std::span<const uint8_t> data) {
 
 /* Add padding and return the message digest. */
 
-constexpr void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
+void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
 	unsigned i;
 	unsigned char finalcount[8];
 	unsigned char c;

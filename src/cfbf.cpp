@@ -261,7 +261,16 @@ static void test_sha1() {
     fmt::print("\n");
 
     auto sv = string_view("abc");
-    hash = sha1(span((uint8_t*)sv.data(), sv.size()));
+
+    {
+        SHA1_CTX ctx;
+
+        for (auto c : sv) {
+            ctx.update(span((uint8_t*)&c, 1));
+        }
+
+        ctx.finalize(hash);
+    }
 
     for (auto c : hash) {
         fmt::print("{:02x} ", c);
@@ -269,8 +278,82 @@ static void test_sha1() {
     fmt::print("\n");
 }
 
+array<uint8_t, 16> generate_key(u16string_view password, const array<uint8_t, 16>& salt) {
+    array<uint8_t, 20> h;
+
+    {
+        SHA1_CTX ctx;
+
+        ctx.update(salt);
+        ctx.update(span((uint8_t*)password.data(), password.size() * sizeof(char16_t)));
+
+        ctx.finalize(h);
+    }
+
+    for (uint32_t i = 0; i < 50000; i++) {
+        SHA1_CTX ctx;
+
+        ctx.update(span((uint8_t*)&i, sizeof(uint32_t)));
+        ctx.update(h);
+
+        ctx.finalize(h);
+    }
+
+    {
+        SHA1_CTX ctx;
+        uint32_t block = 0;
+
+        ctx.update(h);
+        ctx.update(span((uint8_t*)&block, sizeof(uint32_t)));
+
+        ctx.finalize(h);
+    }
+
+    for (auto c : h) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+
+    array<uint8_t, 64> buf1 = {
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
+        0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36
+    };
+
+    for (unsigned int i = 0; auto c : h) {
+        buf1[i] ^= c;
+        i++;
+    }
+
+    auto x1 = sha1(buf1);
+
+    array<uint8_t, 16> ret;
+    memcpy(ret.data(), x1.data(), ret.size());
+
+    return ret;
+}
+
+static void test_key() {
+    const u16string_view password = u"Password1234_";
+    array<uint8_t, 16> salt{0xe8, 0x82, 0x66, 0x49, 0x0c, 0x5b, 0xd1, 0xee, 0xbd, 0x2b, 0x43, 0x94, 0xe3, 0xf8, 0x30, 0xef};
+
+    auto key = generate_key(password, salt);
+
+    for (auto c : key) {
+        fmt::print("{:02x} ", c);
+    }
+    fmt::print("\n");
+}
+
 int main() {
     test_sha1();
+
+    test_key();
 
     try {
         cfbf_test("../password.xlsx");
