@@ -24,6 +24,7 @@ class cfbf {
 public:
     cfbf(const std::filesystem::path& fn);
     uint32_t next_sector(uint32_t sector) const;
+    uint32_t next_mini_sector(uint32_t sector) const;
 
     std::vector<cfbf_entry> entries;
     std::span<const std::byte> s;

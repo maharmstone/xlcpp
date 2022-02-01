@@ -138,6 +138,13 @@ uint32_t cfbf::next_sector(uint32_t sector) const {
     return fat[sector];
 }
 
+uint32_t cfbf::next_mini_sector(uint32_t sector) const {
+    auto& ssh = *(structured_storage_header*)s.data();
+    auto mini_fat = (uint32_t*)(s.data() + ((ssh.mini_fat_start + 1) << ssh.sector_shift));
+
+    return mini_fat[sector];
+}
+
 size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
     auto& ssh = *(structured_storage_header*)file.s.data();
 
@@ -147,13 +154,36 @@ size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
     if (off + buf.size() > de.size)
         buf = buf.subspan(0, de.size - off);
 
+    size_t read = 0;
+    auto sector = de.sect_start;
+
     if (de.size < ssh.mini_sector_cutoff) {
-        // FIXME - mini-FAT
-        throw runtime_error("FIXME - mini-FAT");
+        auto sector_skip = off >> ssh.mini_sector_shift;
+
+        for (unsigned int i = 0; i < sector_skip; i++) {
+            sector = file.next_mini_sector(sector);
+        }
+
+        // FIXME - what if mini_stream more than 1 sector?
+        auto mini_stream = file.s.subspan((file.entries[0].de.sect_start + 1) << ssh.sector_shift, 1 << ssh.sector_shift);
+
+        do {
+            auto src = mini_stream.subspan(sector << ssh.mini_sector_shift, 1 << ssh.mini_sector_shift);
+            auto to_copy = min(src.size(), buf.size());
+
+            memcpy(buf.data(), src.data(), to_copy);
+
+            read += to_copy;
+            buf = buf.subspan(to_copy);
+
+            if (buf.empty())
+                break;
+
+            sector = file.next_mini_sector(sector);
+        } while (true);
     } else {
         auto sector = de.sect_start;
         auto sector_skip = off >> ssh.sector_shift;
-        size_t read = 0;
 
         for (unsigned int i = 0; i < sector_skip; i++) {
             sector = file.next_sector(sector);
@@ -173,9 +203,9 @@ size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
 
             sector = file.next_sector(sector);
         } while (true);
-
-        return read;
     }
+
+    return read;
 }
 
 static void cfbf_test(const filesystem::path& fn) {
@@ -197,11 +227,6 @@ static void cfbf_test(const filesystem::path& fn) {
         fmt::print("--\n");
 
         if (num == 0) { // root
-            num++;
-            continue;
-        }
-
-        if (e.de.size < 0x1000) { // FIXME
             num++;
             continue;
         }
