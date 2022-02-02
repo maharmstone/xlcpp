@@ -217,10 +217,10 @@ static_assert(galois_double(0xff) == 0xe5);
 static void MixColumns(state_t& state) {
     for (uint8_t i = 0; i < 4; i++) {
         auto t = state[i][0];
-        auto tmp = state[i][0] ^ state[i][1] ^ state[i][2] ^ state[i][3];
+        uint8_t tmp = state[i][0] ^ state[i][1] ^ state[i][2] ^ state[i][3];
 
         for (unsigned int j = 0; j < 4; j++) {
-            auto tm = state[i][j];
+            uint8_t tm = state[i][j];
 
             if (j == 3)
                 tm ^= t;
@@ -238,13 +238,19 @@ static constexpr uint8_t Multiply(uint8_t x, uint8_t y) {
     uint8_t ret = (y & 1) * x;
 
     x = galois_double(x);
-    ret ^= (y >> 1 & 1) * x;
+
+    if (y & 2)
+        ret ^= x;
 
     x = galois_double(x);
-    ret ^= (y >> 2 & 1) * x;
 
-    x = galois_double(x);
-    ret ^= (y >> 3 & 1) * x;
+    if (y & 4)
+        ret ^= x;
+
+    if (y & 8) {
+        x = galois_double(x);
+        ret ^= x;
+    }
 
     return ret;
 }
