@@ -31,7 +31,6 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 
 */
 
-
 /*****************************************************************************/
 /* Includes:                                                                 */
 /*****************************************************************************/
@@ -51,8 +50,6 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 /*****************************************************************************/
 // state - array holding the intermediate results during decryption.
 typedef uint8_t state_t[4][4];
-
-
 
 // The lookup-tables are marked const so they can be placed in read-only storage instead of RAM
 // The numbers below can be computed dynamically trading ROM for RAM -
@@ -152,68 +149,58 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key) {
     }
 }
 
-void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
-{
-  KeyExpansion(ctx->RoundKey, key);
+void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key) {
+    KeyExpansion(ctx->RoundKey, key);
 }
 
 // This function adds the round key to state.
 // The round key is added to the state by an XOR function.
-static void AddRoundKey(uint8_t round, state_t& state, const uint8_t* RoundKey)
-{
-  uint8_t i,j;
-  for (i = 0; i < 4; ++i)
-  {
-    for (j = 0; j < 4; ++j)
-    {
-      state[i][j] ^= RoundKey[(round * Nb * 4) + (i * Nb) + j];
+static void AddRoundKey(uint8_t round, state_t& state, const uint8_t* RoundKey) {
+    for (uint8_t i = 0; i < 4; i++) {
+        for (uint8_t j = 0; j < 4; ++j) {
+            state[i][j] ^= RoundKey[(round * Nb * 4) + (i * Nb) + j];
+        }
     }
-  }
 }
 
 // The SubBytes Function Substitutes the values in the
 // state matrix with values in an S-box.
-static void SubBytes(state_t& state)
-{
-  uint8_t i, j;
-  for (i = 0; i < 4; ++i)
-  {
-    for (j = 0; j < 4; ++j)
-    {
-      state[j][i] = sbox[state[j][i]];
+static void SubBytes(state_t& state) {
+    for (uint8_t i = 0; i < 4; i++) {
+        for (uint8_t j = 0; j < 4; j++) {
+            state[j][i] = sbox[state[j][i]];
+        }
     }
-  }
 }
 
 // The ShiftRows() function shifts the rows in the state to the left.
 // Each row is shifted with different offset.
 // Offset = Row number. So the first row is not shifted.
-static void ShiftRows(state_t& state)
-{
-  uint8_t temp;
+static void ShiftRows(state_t& state) {
+    uint8_t temp;
 
-  // Rotate first row 1 columns to left
-  temp           = state[0][1];
-  state[0][1] = state[1][1];
-  state[1][1] = state[2][1];
-  state[2][1] = state[3][1];
-  state[3][1] = temp;
+    // Rotate first row 1 columns to left
+    temp        = state[0][1];
+    state[0][1] = state[1][1];
+    state[1][1] = state[2][1];
+    state[2][1] = state[3][1];
+    state[3][1] = temp;
 
-  // Rotate second row 2 columns to left
-  temp           = state[0][2];
-  state[0][2] = state[2][2];
-  state[2][2] = temp;
+    // Rotate second row 2 columns to left
+    temp        = state[0][2];
+    state[0][2] = state[2][2];
+    state[2][2] = temp;
 
-  temp           = state[1][2];
-  state[1][2] = state[3][2];
-  state[3][2] = temp;
+    temp        = state[1][2];
+    state[1][2] = state[3][2];
+    state[3][2] = temp;
 
-  // Rotate third row 3 columns to left
-  temp           = state[0][3];
-  state[0][3] = state[3][3];
-  state[3][3] = state[2][3];
-  state[2][3] = state[1][3];
-  state[1][3] = temp;
+    // Rotate third row 3 columns to left
+    temp        = state[0][3];
+    state[0][3] = state[3][3];
+    state[3][3] = state[2][3];
+    state[2][3] = state[1][3];
+    state[1][3] = temp;
 }
 
 static constexpr uint8_t xtime(uint8_t x) {
@@ -221,19 +208,24 @@ static constexpr uint8_t xtime(uint8_t x) {
 }
 
 // MixColumns function mixes the columns of the state matrix
-static void MixColumns(state_t& state)
-{
-  uint8_t i;
-  uint8_t Tmp, Tm, t;
-  for (i = 0; i < 4; ++i)
-  {
-    t   = state[i][0];
-    Tmp = state[i][0] ^ state[i][1] ^ state[i][2] ^ state[i][3] ;
-    Tm  = state[i][0] ^ state[i][1] ; Tm = xtime(Tm);  state[i][0] ^= Tm ^ Tmp ;
-    Tm  = state[i][1] ^ state[i][2] ; Tm = xtime(Tm);  state[i][1] ^= Tm ^ Tmp ;
-    Tm  = state[i][2] ^ state[i][3] ; Tm = xtime(Tm);  state[i][2] ^= Tm ^ Tmp ;
-    Tm  = state[i][3] ^ t ;              Tm = xtime(Tm);  state[i][3] ^= Tm ^ Tmp ;
-  }
+static void MixColumns(state_t& state) {
+    for (uint8_t i = 0; i < 4; i++) {
+        uint8_t tm;
+        auto t = state[i][0];
+        auto tmp = state[i][0] ^ state[i][1] ^ state[i][2] ^ state[i][3];
+
+        for (unsigned int j = 0; j < 4; j++) {
+            tm = state[i][j];
+
+            if (j == 3)
+                tm ^= t;
+            else
+                tm ^= state[i][j+1];
+
+            tm = xtime(tm);
+            state[i][j] ^= tm ^ tmp;
+        }
+    }
 }
 
 // Multiply is used to multiply numbers in the field GF(2^8)
@@ -272,108 +264,95 @@ static void InvMixColumns(state_t& state) {
 
 // The SubBytes Function Substitutes the values in the
 // state matrix with values in an S-box.
-static void InvSubBytes(state_t& state)
-{
-  uint8_t i, j;
-  for (i = 0; i < 4; ++i)
-  {
-    for (j = 0; j < 4; ++j)
-    {
-      state[j][i] = rsbox[state[j][i]];
+static void InvSubBytes(state_t& state) {
+    for (uint8_t i = 0; i < 4; i++) {
+        for (uint8_t j = 0; j < 4; j++) {
+            state[j][i] = rsbox[state[j][i]];
+        }
     }
-  }
 }
 
-static void InvShiftRows(state_t& state)
-{
-  uint8_t temp;
+static void InvShiftRows(state_t& state) {
+    uint8_t temp;
 
-  // Rotate first row 1 columns to right
-  temp = state[3][1];
-  state[3][1] = state[2][1];
-  state[2][1] = state[1][1];
-  state[1][1] = state[0][1];
-  state[0][1] = temp;
+    // Rotate first row 1 columns to right
+    temp = state[3][1];
+    state[3][1] = state[2][1];
+    state[2][1] = state[1][1];
+    state[1][1] = state[0][1];
+    state[0][1] = temp;
 
-  // Rotate second row 2 columns to right
-  temp = state[0][2];
-  state[0][2] = state[2][2];
-  state[2][2] = temp;
+    // Rotate second row 2 columns to right
+    temp = state[0][2];
+    state[0][2] = state[2][2];
+    state[2][2] = temp;
 
-  temp = state[1][2];
-  state[1][2] = state[3][2];
-  state[3][2] = temp;
+    temp = state[1][2];
+    state[1][2] = state[3][2];
+    state[3][2] = temp;
 
-  // Rotate third row 3 columns to right
-  temp = state[0][3];
-  state[0][3] = state[1][3];
-  state[1][3] = state[2][3];
-  state[2][3] = state[3][3];
-  state[3][3] = temp;
+    // Rotate third row 3 columns to right
+    temp = state[0][3];
+    state[0][3] = state[1][3];
+    state[1][3] = state[2][3];
+    state[2][3] = state[3][3];
+    state[3][3] = temp;
 }
 
 // Cipher is the main function that encrypts the PlainText.
-static void Cipher(state_t& state, const uint8_t* RoundKey)
-{
-  uint8_t round = 0;
+static void Cipher(state_t& state, const uint8_t* RoundKey) {
+    // Add the First round key to the state before starting the rounds.
+    AddRoundKey(0, state, RoundKey);
 
-  // Add the First round key to the state before starting the rounds.
-  AddRoundKey(0, state, RoundKey);
+    // There will be Nr rounds.
+    // The first Nr-1 rounds are identical.
+    // These Nr rounds are executed in the loop below.
+    // Last one without MixColumns()
+    for (uint8_t round = 1; ; round++) {
+        SubBytes(state);
+        ShiftRows(state);
 
-  // There will be Nr rounds.
-  // The first Nr-1 rounds are identical.
-  // These Nr rounds are executed in the loop below.
-  // Last one without MixColumns()
-  for (round = 1; ; ++round)
-  {
-    SubBytes(state);
-    ShiftRows(state);
-    if (round == Nr) {
-      break;
+        if (round == Nr)
+            break;
+
+        MixColumns(state);
+        AddRoundKey(round, state, RoundKey);
     }
-    MixColumns(state);
-    AddRoundKey(round, state, RoundKey);
-  }
-  // Add round key to last round
-  AddRoundKey(Nr, state, RoundKey);
+
+    // Add round key to last round
+    AddRoundKey(Nr, state, RoundKey);
 }
 
-static void InvCipher(state_t& state, const uint8_t* RoundKey)
-{
-  uint8_t round = 0;
+static void InvCipher(state_t& state, const uint8_t* RoundKey) {
+    // Add the First round key to the state before starting the rounds.
+    AddRoundKey(Nr, state, RoundKey);
 
-  // Add the First round key to the state before starting the rounds.
-  AddRoundKey(Nr, state, RoundKey);
+    // There will be Nr rounds.
+    // The first Nr-1 rounds are identical.
+    // These Nr rounds are executed in the loop below.
+    // Last one without InvMixColumn()
+    for (uint8_t round = Nr - 1; ; round--) {
+        InvShiftRows(state);
+        InvSubBytes(state);
+        AddRoundKey(round, state, RoundKey);
 
-  // There will be Nr rounds.
-  // The first Nr-1 rounds are identical.
-  // These Nr rounds are executed in the loop below.
-  // Last one without InvMixColumn()
-  for (round = (Nr - 1); ; --round)
-  {
-    InvShiftRows(state);
-    InvSubBytes(state);
-    AddRoundKey(round, state, RoundKey);
-    if (round == 0) {
-      break;
+        if (round == 0)
+            break;
+
+        InvMixColumns(state);
     }
-    InvMixColumns(state);
-  }
-
 }
 
 /*****************************************************************************/
 /* Public functions:                                                         */
 /*****************************************************************************/
 
-void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf)
-{
+void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf) {
   // The next function call encrypts the PlainText with the Key using AES algorithm.
   Cipher(*(state_t*)buf, ctx->RoundKey);
 }
 
-void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf)
-{
+void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf) {
   // The next function call decrypts the PlainText with the Key using AES algorithm.
   InvCipher(*(state_t*)buf, ctx->RoundKey);
 }

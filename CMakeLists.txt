@@ -65,6 +65,12 @@ if(BUILD_SAMPLE)
     target_include_directories(cfbf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(cfbf xlcpp)
     install(TARGETS cfbf DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
+
+    target_compile_options(cfbf PRIVATE
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+            -Wall -Wno-trigraphs -Wconversion>
+        $<$<CXX_COMPILER_ID:MSVC>:
+            /W4>)
 endif()
 
 install(EXPORT xlcpp-targets DESTINATION lib/cmake/xlcpp)
