@@ -199,60 +199,60 @@ constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 /* Run your data through this. */
 
 void SHA1_CTX::update(std::span<const uint8_t> data) {
-	uint32_t i;
-	uint32_t j;
+    uint32_t i;
+    uint32_t j;
 
-	j = count[0];
-	if ((count[0] += data.size() << 3) < j)
-		count[1]++;
-	count[1] += (data.size()>>29);
-	j = (j >> 3) & 63;
-	if ((j + data.size()) > 63) {
+    j = count[0];
+    if ((count[0] += data.size() << 3) < j)
+        count[1]++;
+    count[1] += (data.size()>>29);
+    j = (j >> 3) & 63;
+    if ((j + data.size()) > 63) {
         i = 64 - j;
-		memcpy(&buffer[j], data.data(), i);
-		SHA1Transform(state, buffer);
-		for ( ; i + 63 < data.size(); i += 64) {
-			SHA1Transform(state, (uint8_t*)&data[i]);
-		}
-		j = 0;
-	}
-	else i = 0;
-	memcpy(&buffer[j], &data[i], data.size() - i);
+        memcpy(&buffer[j], data.data(), i);
+        SHA1Transform(state, buffer);
+        for ( ; i + 63 < data.size(); i += 64) {
+            SHA1Transform(state, (uint8_t*)&data[i]);
+        }
+        j = 0;
+    }
+    else i = 0;
+    memcpy(&buffer[j], &data[i], data.size() - i);
 }
 
 
 /* Add padding and return the message digest. */
 
 void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
-	unsigned i;
-	unsigned char finalcount[8];
-	unsigned char c;
+    unsigned i;
+    unsigned char finalcount[8];
+    unsigned char c;
 
-	for (i = 0; i < 8; i++) {
-		finalcount[i] = (unsigned char)((count[(i >= 4 ? 0 : 1)]
-			>> ((3-(i & 3)) * 8) ) & 255);  /* Endian independent */
-	}
+    for (i = 0; i < 8; i++) {
+        finalcount[i] = (unsigned char)((count[(i >= 4 ? 0 : 1)]
+            >> ((3-(i & 3)) * 8) ) & 255);  /* Endian independent */
+    }
 
-	c = 0200;
-	update(span(&c, 1));
-	while ((count[0] & 504) != 448) {
-		c = 0000;
-		update(span(&c, 1));
-	}
-	update(span(finalcount, 8));  /* Should cause a SHA1Transform() */
-	for (i = 0; i < 20; i++) {
-		digest[i] = (unsigned char)
-			((state[i>>2] >> ((3-(i & 3)) * 8) ) & 255);
-	}
+    c = 0200;
+    update(span(&c, 1));
+    while ((count[0] & 504) != 448) {
+        c = 0000;
+        update(span(&c, 1));
+    }
+    update(span(finalcount, 8));  /* Should cause a SHA1Transform() */
+    for (i = 0; i < 20; i++) {
+        digest[i] = (unsigned char)
+            ((state[i>>2] >> ((3-(i & 3)) * 8) ) & 255);
+    }
 }
 
 array<uint8_t, 20> sha1(span<const uint8_t> s) {
-	array<uint8_t, 20> digest;
-	SHA1_CTX ctx;
+    array<uint8_t, 20> digest;
+    SHA1_CTX ctx;
 
-	ctx.update(s);
-	ctx.finalize(digest);
+    ctx.update(s);
+    ctx.finalize(digest);
 
-	return digest;
+    return digest;
 }
 
