@@ -51,7 +51,7 @@ public:
     std::span<const std::byte> s;
 
 private:
-    void add_entry(std::string_view path, uint32_t num);
+    void add_entry(std::string_view path, uint32_t num, bool ignore_right);
     void check_password(std::u16string_view password, std::span<const uint8_t> salt,
                         std::span<const uint8_t> encrypted_verifier,
                         std::span<const uint8_t> encrypted_verifier_hash);

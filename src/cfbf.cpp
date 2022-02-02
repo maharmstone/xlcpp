@@ -112,7 +112,7 @@ cfbf::cfbf(const filesystem::path& fn) {
     if (de.type != obj_type::STGTY_ROOT)
         throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
 
-    add_entry("", 0);
+    add_entry("", 0, false);
 }
 
 const dirent& cfbf::find_dirent(uint32_t num) {
@@ -130,18 +130,21 @@ const dirent& cfbf::find_dirent(uint32_t num) {
     return *(dirent*)(s.data() + ((sector + 1) << ssh.sector_shift) + ((num % dirents_per_sector) * sizeof(dirent)));
 }
 
-void cfbf::add_entry(string_view path, uint32_t num) {
+void cfbf::add_entry(string_view path, uint32_t num, bool ignore_right) {
     const auto& de = find_dirent(num);
+
+    if (de.sid_left_sibling != NOSTREAM)
+        add_entry(path, de.sid_left_sibling, true);
 
     auto name = de.name_len >= sizeof(char16_t) && num != 0 ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "";
 
     entries.emplace_back(*this, de, string(path) + name);
 
     if (de.sid_child != NOSTREAM)
-        add_entry(name + "/", de.sid_child);
+        add_entry(string(path) + string(name) + "/", de.sid_child, false);
 
-    if (de.sid_right_sibling != NOSTREAM)
-        add_entry(path, de.sid_right_sibling);
+    if (!ignore_right && de.sid_right_sibling != NOSTREAM)
+        add_entry(path, de.sid_right_sibling, false);
 }
 
 cfbf_entry::cfbf_entry(cfbf& file, const dirent& de, string_view name) : file(file), de(de), name(name) {
