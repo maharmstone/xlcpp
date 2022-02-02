@@ -99,28 +99,6 @@ static const uint8_t rsbox[256] = {
 static const uint8_t Rcon[11] = {
   0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36 };
 
-/*
- * Jordan Goulder points out in PR #12 (https://github.com/kokke/tiny-AES-C/pull/12),
- * that you can remove most of the elements in the Rcon array, because they are unused.
- *
- * From Wikipedia's article on the Rijndael key schedule @ https://en.wikipedia.org/wiki/Rijndael_key_schedule#Rcon
- *
- * "Only the first some of these constants are actually used – up to rcon[10] for AES-128 (as 11 round keys are needed),
- *  up to rcon[8] for AES-192, up to rcon[7] for AES-256. rcon[0] is not used in AES algorithm."
- */
-
-
-/*****************************************************************************/
-/* Private functions:                                                        */
-/*****************************************************************************/
-/*
-static uint8_t getSBoxValue(uint8_t num)
-{
-  return sbox[num];
-}
-*/
-#define getSBoxValue(num) (sbox[(num)])
-
 // This function produces Nb(Nr+1) round keys. The round keys are used in each round to decrypt the states.
 static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
 {
@@ -167,10 +145,10 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
 
       // Function Subword()
       {
-        tempa[0] = getSBoxValue(tempa[0]);
-        tempa[1] = getSBoxValue(tempa[1]);
-        tempa[2] = getSBoxValue(tempa[2]);
-        tempa[3] = getSBoxValue(tempa[3]);
+        tempa[0] = sbox[tempa[0]];
+        tempa[1] = sbox[tempa[1]];
+        tempa[2] = sbox[tempa[2]];
+        tempa[3] = sbox[tempa[3]];
       }
 
       tempa[0] = tempa[0] ^ Rcon[i/Nk];
@@ -211,7 +189,7 @@ static void SubBytes(state_t& state)
   {
     for (j = 0; j < 4; ++j)
     {
-      state[j][i] = getSBoxValue(state[j][i]);
+      state[j][i] = sbox[state[j][i]];
     }
   }
 }
