@@ -289,8 +289,6 @@ static void MixColumns(state_t& state)
       ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^         \
       ((y>>4 & 1) * xtime(xtime(xtime(xtime(x))))))   \
 
-#define getSBoxInvert(num) (rsbox[(num)])
-
 // MixColumns function mixes the columns of the state matrix.
 // The method used to multiply may be difficult to understand for the inexperienced.
 // Please use the references to gain more information.
@@ -322,7 +320,7 @@ static void InvSubBytes(state_t& state)
   {
     for (j = 0; j < 4; ++j)
     {
-      state[j][i] = getSBoxInvert(state[j][i]);
+      state[j][i] = rsbox[state[j][i]];
     }
   }
 }
