@@ -167,27 +167,34 @@ uint32_t cfbf::next_mini_sector(uint32_t sector) const {
 size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
     auto& ssh = *(structured_storage_header*)file.s.data();
 
-    if (off > de.size)
+    if (off >= de.size)
         return 0;
 
     if (off + buf.size() > de.size)
         buf = buf.subspan(0, de.size - off);
 
     size_t read = 0;
-    auto sector = de.sect_start;
 
     if (de.size < ssh.mini_sector_cutoff) {
-        auto sector_skip = off >> ssh.mini_sector_shift;
+        auto mini_sector = de.sect_start;
+        auto mini_sector_skip = off >> ssh.mini_sector_shift;
 
-        for (unsigned int i = 0; i < sector_skip; i++) {
-            sector = file.next_mini_sector(sector);
+        for (unsigned int i = 0; i < mini_sector_skip; i++) {
+            mini_sector = file.next_mini_sector(mini_sector);
         }
 
-        // FIXME - what if mini_stream more than 1 sector?
-        auto mini_stream = file.s.subspan((file.entries[0].de.sect_start + 1) << ssh.sector_shift, 1 << ssh.sector_shift);
+        auto mini_sectors_per_sector = 1 << (ssh.sector_shift - ssh.mini_sector_shift);
 
         do {
-            auto src = mini_stream.subspan(sector << ssh.mini_sector_shift, 1 << ssh.mini_sector_shift);
+            auto mini_stream_sector = mini_sector / mini_sectors_per_sector;
+            auto sector = file.entries[0].de.sect_start;
+
+            while (mini_stream_sector > 0) {
+                sector = file.next_sector(sector);
+                mini_stream_sector--;
+            }
+
+            auto src = file.s.subspan(((sector + 1) << ssh.sector_shift) + ((mini_sector % mini_sectors_per_sector) << ssh.mini_sector_shift), 1 << ssh.mini_sector_shift);
             auto to_copy = min(src.size(), buf.size());
 
             memcpy(buf.data(), src.data(), to_copy);
@@ -198,7 +205,7 @@ size_t cfbf_entry::read(span<std::byte> buf, uint64_t off) const {
             if (buf.empty())
                 break;
 
-            sector = file.next_mini_sector(sector);
+            mini_sector = file.next_mini_sector(mini_sector);
         } while (true);
     } else {
         auto sector = de.sect_start;
