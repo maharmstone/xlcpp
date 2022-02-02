@@ -100,65 +100,56 @@ static const uint8_t Rcon[11] = {
   0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36 };
 
 // This function produces Nb(Nr+1) round keys. The round keys are used in each round to decrypt the states.
-static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
-{
-  unsigned i, j, k;
-  uint8_t tempa[4]; // Used for the column/row operations
+static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key) {
+    uint8_t tempa[4]; // Used for the column/row operations
 
-  // The first round key is the key itself.
-  for (i = 0; i < Nk; ++i)
-  {
-    RoundKey[(i * 4) + 0] = Key[(i * 4) + 0];
-    RoundKey[(i * 4) + 1] = Key[(i * 4) + 1];
-    RoundKey[(i * 4) + 2] = Key[(i * 4) + 2];
-    RoundKey[(i * 4) + 3] = Key[(i * 4) + 3];
-  }
-
-  // All other round keys are found from the previous round keys.
-  for (i = Nk; i < Nb * (Nr + 1); ++i)
-  {
-    {
-      k = (i - 1) * 4;
-      tempa[0]=RoundKey[k + 0];
-      tempa[1]=RoundKey[k + 1];
-      tempa[2]=RoundKey[k + 2];
-      tempa[3]=RoundKey[k + 3];
-
+    // The first round key is the key itself.
+    for (unsigned int i = 0; i < Nk; i++) {
+        RoundKey[i * 4] = Key[i * 4];
+        RoundKey[(i * 4) + 1] = Key[(i * 4) + 1];
+        RoundKey[(i * 4) + 2] = Key[(i * 4) + 2];
+        RoundKey[(i * 4) + 3] = Key[(i * 4) + 3];
     }
 
-    if (i % Nk == 0)
-    {
-      // This function shifts the 4 bytes in a word to the left once.
-      // [a0,a1,a2,a3] becomes [a1,a2,a3,a0]
+    // All other round keys are found from the previous round keys.
+    for (unsigned int i = Nk; i < Nb * (Nr + 1); i++) {
+        tempa[0] = RoundKey[(i * 4) - 4];
+        tempa[1] = RoundKey[(i * 4) - 3];
+        tempa[2] = RoundKey[(i * 4) - 2];
+        tempa[3] = RoundKey[(i * 4) - 1];
 
-      // Function RotWord()
-      {
-        const uint8_t u8tmp = tempa[0];
-        tempa[0] = tempa[1];
-        tempa[1] = tempa[2];
-        tempa[2] = tempa[3];
-        tempa[3] = u8tmp;
-      }
+        if (i % Nk == 0) {
+            // This function shifts the 4 bytes in a word to the left once.
+            // [a0,a1,a2,a3] becomes [a1,a2,a3,a0]
 
-      // SubWord() is a function that takes a four-byte input word and
-      // applies the S-box to each of the four bytes to produce an output word.
+            // Function RotWord()
+            {
+                const uint8_t u8tmp = tempa[0];
+                tempa[0] = tempa[1];
+                tempa[1] = tempa[2];
+                tempa[2] = tempa[3];
+                tempa[3] = u8tmp;
+            }
 
-      // Function Subword()
-      {
-        tempa[0] = sbox[tempa[0]];
-        tempa[1] = sbox[tempa[1]];
-        tempa[2] = sbox[tempa[2]];
-        tempa[3] = sbox[tempa[3]];
-      }
+            // SubWord() is a function that takes a four-byte input word and
+            // applies the S-box to each of the four bytes to produce an output word.
 
-      tempa[0] = tempa[0] ^ Rcon[i/Nk];
+            // Function Subword()
+            {
+                tempa[0] = sbox[tempa[0]];
+                tempa[1] = sbox[tempa[1]];
+                tempa[2] = sbox[tempa[2]];
+                tempa[3] = sbox[tempa[3]];
+            }
+
+            tempa[0] = tempa[0] ^ Rcon[i/Nk];
+        }
+
+        RoundKey[i * 4] = RoundKey[(i - Nk) * 4] ^ tempa[0];
+        RoundKey[(i * 4) + 1] = RoundKey[((i - Nk) * 4) + 1] ^ tempa[1];
+        RoundKey[(i * 4) + 2] = RoundKey[((i - Nk) * 4) + 2] ^ tempa[2];
+        RoundKey[(i * 4) + 3] = RoundKey[((i - Nk) * 4) + 3] ^ tempa[3];
     }
-    j = i * 4; k=(i - Nk) * 4;
-    RoundKey[j + 0] = RoundKey[k + 0] ^ tempa[0];
-    RoundKey[j + 1] = RoundKey[k + 1] ^ tempa[1];
-    RoundKey[j + 2] = RoundKey[k + 2] ^ tempa[2];
-    RoundKey[j + 3] = RoundKey[k + 3] ^ tempa[3];
-  }
 }
 
 void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
