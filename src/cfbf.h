@@ -31,11 +31,11 @@ struct dirent;
 
 class cfbf_entry {
 public:
-    cfbf_entry(cfbf& file, dirent& de, std::string_view name);
+    cfbf_entry(cfbf& file, const dirent& de, std::string_view name);
     size_t read(std::span<std::byte> buf, uint64_t off) const;
 
     cfbf& file;
-    dirent& de;
+    const dirent& de;
     std::string name;
 };
 
@@ -55,6 +55,7 @@ private:
     void check_password(std::u16string_view password, std::span<const uint8_t> salt,
                         std::span<const uint8_t> encrypted_verifier,
                         std::span<const uint8_t> encrypted_verifier_hash);
+    const dirent& find_dirent(uint32_t num);
 
     std::unique_ptr<mmap> m;
     std::array<uint8_t, 16> key;

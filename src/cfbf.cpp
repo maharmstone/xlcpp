@@ -115,10 +115,24 @@ cfbf::cfbf(const filesystem::path& fn) {
     add_entry("", 0);
 }
 
-void cfbf::add_entry(string_view path, uint32_t num) {
+const dirent& cfbf::find_dirent(uint32_t num) {
     auto& ssh = *(structured_storage_header*)s.data();
-    auto dirents = s.subspan((ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
-    auto& de = *(dirent*)(dirents.data() + (num * sizeof(dirent)));
+
+    auto dirents_per_sector = (1 << ssh.sector_shift) / sizeof(dirent);
+    auto sector_skip = num / dirents_per_sector;
+    auto sector = ssh.sect_dir_start;
+
+    while (sector_skip > 0) {
+        sector = next_sector(sector);
+        sector_skip--;
+    }
+
+    return *(dirent*)(s.data() + ((sector + 1) << ssh.sector_shift) + ((num % dirents_per_sector) * sizeof(dirent)));
+}
+
+void cfbf::add_entry(string_view path, uint32_t num) {
+    const auto& de = find_dirent(num);
+
     auto name = de.name_len >= sizeof(char16_t) && num != 0 ? utf16_to_utf8(u16string_view(de.name, (de.name_len / sizeof(char16_t)) - 1)) : "";
 
     entries.emplace_back(*this, de, string(path) + name);
@@ -130,7 +144,7 @@ void cfbf::add_entry(string_view path, uint32_t num) {
         add_entry(path, de.sid_right_sibling);
 }
 
-cfbf_entry::cfbf_entry(cfbf& file, dirent& de, string_view name) : file(file), de(de), name(name) {
+cfbf_entry::cfbf_entry(cfbf& file, const dirent& de, string_view name) : file(file), de(de), name(name) {
 }
 
 uint32_t cfbf::next_sector(uint32_t sector) const {
