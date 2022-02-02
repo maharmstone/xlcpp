@@ -200,14 +200,19 @@ constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
 
 void SHA1_CTX::update(std::span<const uint8_t> data) {
     uint32_t i;
-    uint32_t j;
 
-    j = count[0];
-    if ((count[0] += data.size() << 3) < j)
+    auto j = count[0];
+
+    count[0] += (uint32_t)(data.size() << 3);
+
+    if (count[0] < j)
         count[1]++;
-    count[1] += (data.size()>>29);
+
+    count[1] += (uint32_t)(data.size() >> 29);
+
     j = (j >> 3) & 63;
-    if ((j + data.size()) > 63) {
+
+    if (j + data.size() > 63) {
         i = 64 - j;
         memcpy(&buffer[j], data.data(), i);
         SHA1Transform(state, buffer);
@@ -215,8 +220,9 @@ void SHA1_CTX::update(std::span<const uint8_t> data) {
             SHA1Transform(state, (uint8_t*)&data[i]);
         }
         j = 0;
-    }
-    else i = 0;
+    } else
+        i = 0;
+
     memcpy(&buffer[j], &data[i], data.size() - i);
 }
 
