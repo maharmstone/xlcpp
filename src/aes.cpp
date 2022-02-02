@@ -203,43 +203,48 @@ static void ShiftRows(state_t& state) {
     state[1][3] = temp;
 }
 
-static constexpr uint8_t xtime(uint8_t x) {
-    return (x << 1) ^ (((x >> 7) & 1) * 0x1b);
+static constexpr uint8_t galois_double(uint8_t x) {
+    return (uint8_t)((x << 1) ^ (((x >> 7) & 1) * 0x1b));
 }
+
+static_assert(galois_double(0x00) == 0x00);
+static_assert(galois_double(0x01) == 0x02);
+static_assert(galois_double(0x7f) == 0xfe);
+static_assert(galois_double(0x80) == 0x1b);
+static_assert(galois_double(0xff) == 0xe5);
 
 // MixColumns function mixes the columns of the state matrix
 static void MixColumns(state_t& state) {
     for (uint8_t i = 0; i < 4; i++) {
-        uint8_t tm;
         auto t = state[i][0];
         auto tmp = state[i][0] ^ state[i][1] ^ state[i][2] ^ state[i][3];
 
         for (unsigned int j = 0; j < 4; j++) {
-            tm = state[i][j];
+            auto tm = state[i][j];
 
             if (j == 3)
                 tm ^= t;
             else
                 tm ^= state[i][j+1];
 
-            tm = xtime(tm);
+            tm = galois_double(tm);
             state[i][j] ^= tm ^ tmp;
         }
     }
 }
 
 // Multiply is used to multiply numbers in the field GF(2^8)
-// Note: The last call to xtime() is unneeded, but often ends up generating a smaller binary
-//       The compiler seems to be able to vectorize the operation better this way.
-//       See https://github.com/kokke/tiny-AES-c/pull/34
 static constexpr uint8_t Multiply(uint8_t x, uint8_t y) {
-    uint8_t ret;
+    uint8_t ret = (y & 1) * x;
 
-    ret = (y & 1) * x;
-    ret ^= (y >> 1 & 1) * xtime(x);
-    ret ^= (y >> 2 & 1) * xtime(xtime(x));
-    ret ^= (y >> 3 & 1) * xtime(xtime(xtime(x)));
-    ret ^= (y >> 4 & 1) * xtime(xtime(xtime(xtime(x))));
+    x = galois_double(x);
+    ret ^= (y >> 1 & 1) * x;
+
+    x = galois_double(x);
+    ret ^= (y >> 2 & 1) * x;
+
+    x = galois_double(x);
+    ret ^= (y >> 3 & 1) * x;
 
     return ret;
 }
