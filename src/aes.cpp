@@ -46,16 +46,6 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 #define Nk 4        // The number of 32 bit words in a key.
 #define Nr 10       // The number of rounds in AES Cipher.
 
-// jcallan@github points out that declaring Multiply as a function
-// reduces code size considerably with the Keil ARM compiler.
-// See this link for more information: https://github.com/kokke/tiny-AES-C/pull/3
-#ifndef MULTIPLY_AS_A_FUNCTION
-  #define MULTIPLY_AS_A_FUNCTION 0
-#endif
-
-
-
-
 /*****************************************************************************/
 /* Private variables:                                                        */
 /*****************************************************************************/
@@ -257,9 +247,8 @@ static void ShiftRows(state_t& state)
   state[1][3] = temp;
 }
 
-static uint8_t xtime(uint8_t x)
-{
-  return ((x<<1) ^ (((x>>7) & 1) * 0x1b));
+static constexpr uint8_t xtime(uint8_t x) {
+    return (x << 1) ^ (((x >> 7) & 1) * 0x1b);
 }
 
 // MixColumns function mixes the columns of the state matrix
@@ -282,32 +271,33 @@ static void MixColumns(state_t& state)
 // Note: The last call to xtime() is unneeded, but often ends up generating a smaller binary
 //       The compiler seems to be able to vectorize the operation better this way.
 //       See https://github.com/kokke/tiny-AES-c/pull/34
-#define Multiply(x, y)                                \
-      (  ((y & 1) * x) ^                              \
-      ((y>>1 & 1) * xtime(x)) ^                       \
-      ((y>>2 & 1) * xtime(xtime(x))) ^                \
-      ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^         \
-      ((y>>4 & 1) * xtime(xtime(xtime(xtime(x))))))   \
+static constexpr uint8_t Multiply(uint8_t x, uint8_t y) {
+    uint8_t ret;
+
+    ret = (y & 1) * x;
+    ret ^= (y >> 1 & 1) * xtime(x);
+    ret ^= (y >> 2 & 1) * xtime(xtime(x));
+    ret ^= (y >> 3 & 1) * xtime(xtime(xtime(x)));
+    ret ^= (y >> 4 & 1) * xtime(xtime(xtime(xtime(x))));
+
+    return ret;
+}
 
 // MixColumns function mixes the columns of the state matrix.
 // The method used to multiply may be difficult to understand for the inexperienced.
 // Please use the references to gain more information.
-static void InvMixColumns(state_t& state)
-{
-  int i;
-  uint8_t a, b, c, d;
-  for (i = 0; i < 4; ++i)
-  {
-    a = state[i][0];
-    b = state[i][1];
-    c = state[i][2];
-    d = state[i][3];
+static void InvMixColumns(state_t& state) {
+    for (unsigned int i = 0; i < 4; i++) {
+        auto a = state[i][0];
+        auto b = state[i][1];
+        auto c = state[i][2];
+        auto d = state[i][3];
 
-    state[i][0] = Multiply(a, 0x0e) ^ Multiply(b, 0x0b) ^ Multiply(c, 0x0d) ^ Multiply(d, 0x09);
-    state[i][1] = Multiply(a, 0x09) ^ Multiply(b, 0x0e) ^ Multiply(c, 0x0b) ^ Multiply(d, 0x0d);
-    state[i][2] = Multiply(a, 0x0d) ^ Multiply(b, 0x09) ^ Multiply(c, 0x0e) ^ Multiply(d, 0x0b);
-    state[i][3] = Multiply(a, 0x0b) ^ Multiply(b, 0x0d) ^ Multiply(c, 0x09) ^ Multiply(d, 0x0e);
-  }
+        state[i][0] = Multiply(a, 0x0e) ^ Multiply(b, 0x0b) ^ Multiply(c, 0x0d) ^ Multiply(d, 0x09);
+        state[i][1] = Multiply(a, 0x09) ^ Multiply(b, 0x0e) ^ Multiply(c, 0x0b) ^ Multiply(d, 0x0d);
+        state[i][2] = Multiply(a, 0x0d) ^ Multiply(b, 0x09) ^ Multiply(c, 0x0e) ^ Multiply(d, 0x0b);
+        state[i][3] = Multiply(a, 0x0b) ^ Multiply(b, 0x0d) ^ Multiply(c, 0x09) ^ Multiply(d, 0x0e);
+    }
 }
 
 
