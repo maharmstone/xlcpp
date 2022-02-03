@@ -458,7 +458,7 @@ mmap::~mmap() {
 #endif
 }
 
-span<const std::byte> mmap::map() {
+span<const uint8_t> mmap::map() {
 #ifdef _WIN32
 	if (!ptr) {
 		ptr = MapViewOfFile(mh, FILE_MAP_READ, 0, 0, 0);
@@ -468,5 +468,5 @@ span<const std::byte> mmap::map() {
 	}
 #endif
 
-	return span((const std::byte*)ptr, filesize);
+	return span((const uint8_t*)ptr, filesize);
 }

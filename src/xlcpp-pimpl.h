@@ -127,6 +127,9 @@ public:
     HANDLE h2;
     uint8_t readbuf[1048576];
 #endif
+
+private:
+    void load_from_memory(std::span<const uint8_t> sv);
 };
 
 class sheet_pimpl {

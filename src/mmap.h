@@ -138,7 +138,7 @@ class mmap {
 public:
 	explicit mmap(fd_t h);
 	~mmap();
-	std::span<const std::byte> map();
+	std::span<const uint8_t> map();
 
 	size_t filesize;
 

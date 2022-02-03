@@ -49,7 +49,7 @@ public:
     void decrypt(std::span<uint8_t> enc_package);
 
     std::vector<cfbf_entry> entries;
-    std::span<const std::byte> s;
+    std::span<const uint8_t> s;
 
 private:
     void add_entry(std::string_view path, uint32_t num, bool ignore_right);

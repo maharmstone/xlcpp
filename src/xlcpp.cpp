@@ -1854,24 +1854,19 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 
     auto mem = m.map();
 
+    load_from_memory(mem);
+}
+
+workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
+    load_from_memory(sv);
+}
+
+void workbook_pimpl::load_from_memory(span<const uint8_t> mem) {
     archive_read_t a{archive_read_new()};
 
     archive_read_support_format_zip(a.get());
 
     auto r = archive_read_open_memory(a.get(), mem.data(), mem.size());
-
-    if (r != ARCHIVE_OK)
-        throw formatted_error("{}", archive_error_string(a.get()));
-
-    load_archive(a.get());
-}
-
-workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
-    archive_read_t a{archive_read_new()};
-
-    archive_read_support_format_zip(a.get());
-
-    auto r = archive_read_open_memory(a.get(), sv.data(), sv.size());
 
     if (r != ARCHIVE_OK)
         throw formatted_error("{}", archive_error_string(a.get()));
