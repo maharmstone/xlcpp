@@ -33,6 +33,7 @@ class cfbf_entry {
 public:
     cfbf_entry(cfbf& file, const dirent& de, std::string_view name);
     size_t read(std::span<std::byte> buf, uint64_t off) const;
+    size_t get_size() const;
 
     cfbf& file;
     const dirent& de;

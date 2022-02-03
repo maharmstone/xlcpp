@@ -61,7 +61,7 @@ if(BUILD_SAMPLE)
     install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
 
     # TESTING
-    add_executable(cfbf src/cfbf.cpp src/mmap.cpp src/sha1.cpp src/aes.cpp)
+    add_executable(cfbf src/cfbf.cpp src/mmap.cpp src/sha1.cpp src/aes.cpp src/cfbf-test.cpp)
     target_include_directories(cfbf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(cfbf xlcpp)
     install(TARGETS cfbf DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
