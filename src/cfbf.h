@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <vector>
 #include <span>
+#include <array>
 #include <fmt/format.h>
 #include <fmt/compile.h>
 

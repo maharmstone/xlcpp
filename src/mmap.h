@@ -4,7 +4,6 @@
 #include <string_view>
 #include <span>
 #include <memory>
-#include <unistd.h>
 #include <fcntl.h>
 
 #ifdef _WIN32
@@ -12,6 +11,7 @@
 #include "utf16.h"
 using fd_t = HANDLE;
 #else
+#include <unistd.h>
 using fd_t = int;
 #endif
 

@@ -89,8 +89,7 @@ constexpr void R4(uint32_t v, uint32_t& w, uint32_t x, uint32_t y, uint32_t& z, 
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
 
-constexpr void SHA1Transform(uint32_t state[5], uint8_t buffer[64])
-{
+static void SHA1Transform(uint32_t state[5], uint8_t buffer[64]) {
     uint32_t a, b, c, d, e;
     uint32_t l[16];
 
