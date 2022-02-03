@@ -178,13 +178,169 @@ static constexpr void utf16_to_utf8_range(std::basic_string_view<T> sv, U& t) no
     }
 }
 
-static std::string utf16_to_utf8(std::u16string_view sv) {
+static std::string __inline utf16_to_utf8(std::u16string_view sv) {
     if (sv.empty())
         return "";
 
     std::string ret(utf16_to_utf8_len(sv), 0);
 
     utf16_to_utf8_range(sv, ret);
+
+    return ret;
+}
+
+static constexpr size_t utf8_to_utf16_len(std::string_view sv) noexcept {
+    size_t ret = 0;
+
+    while (!sv.empty()) {
+        if ((uint8_t)sv[0] < 0x80) {
+            ret++;
+            sv = sv.substr(1);
+        } else if (((uint8_t)sv[0] & 0xe0) == 0xc0 && (uint8_t)sv.length() >= 2 && ((uint8_t)sv[1] & 0xc0) == 0x80) {
+            ret++;
+            sv = sv.substr(2);
+        } else if (((uint8_t)sv[0] & 0xf0) == 0xe0 && (uint8_t)sv.length() >= 3 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80) {
+            ret++;
+            sv = sv.substr(3);
+        } else if (((uint8_t)sv[0] & 0xf8) == 0xf0 && (uint8_t)sv.length() >= 4 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80 && ((uint8_t)sv[3] & 0xc0) == 0x80) {
+            char32_t cp = (char32_t)(((uint8_t)sv[0] & 0x7) << 18) | (char32_t)(((uint8_t)sv[1] & 0x3f) << 12) | (char32_t)(((uint8_t)sv[2] & 0x3f) << 6) | (char32_t)((uint8_t)sv[3] & 0x3f);
+
+            if (cp > 0x10ffff) {
+                ret++;
+                sv = sv.substr(4);
+                continue;
+            }
+
+            ret += 2;
+            sv = sv.substr(4);
+        } else {
+            ret++;
+            sv = sv.substr(1);
+        }
+    }
+
+    return ret;
+}
+
+static constexpr size_t utf8_to_utf16_len(std::u8string_view sv) noexcept {
+    return utf8_to_utf16_len(std::string_view(std::bit_cast<char*>(sv.data()), sv.length()));
+}
+
+template<typename T>
+requires (std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>) ||
+    (sizeof(wchar_t) == 2 && std::ranges::output_range<T, wchar_t> && std::is_same_v<std::ranges::range_value_t<T>, wchar_t>)
+static constexpr void utf8_to_utf16_range(std::string_view sv, T& t) noexcept {
+    auto ptr = t.begin();
+
+    if (ptr == t.end())
+        return;
+
+    while (!sv.empty()) {
+        if ((uint8_t)sv[0] < 0x80) {
+            *ptr = (uint8_t)sv[0];
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            sv = sv.substr(1);
+        } else if (((uint8_t)sv[0] & 0xe0) == 0xc0 && (uint8_t)sv.length() >= 2 && ((uint8_t)sv[1] & 0xc0) == 0x80) {
+            char16_t cp = (char16_t)(((uint8_t)sv[0] & 0x1f) << 6) | (char16_t)((uint8_t)sv[1] & 0x3f);
+
+            *ptr = cp;
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            sv = sv.substr(2);
+        } else if (((uint8_t)sv[0] & 0xf0) == 0xe0 && (uint8_t)sv.length() >= 3 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80) {
+            char16_t cp = (char16_t)(((uint8_t)sv[0] & 0xf) << 12) | (char16_t)(((uint8_t)sv[1] & 0x3f) << 6) | (char16_t)((uint8_t)sv[2] & 0x3f);
+
+            if (cp >= 0xd800 && cp <= 0xdfff) {
+                *ptr = 0xfffd;
+                ptr++;
+
+                if (ptr == t.end())
+                    return;
+
+                sv = sv.substr(3);
+                continue;
+            }
+
+            *ptr = cp;
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            sv = sv.substr(3);
+        } else if (((uint8_t)sv[0] & 0xf8) == 0xf0 && (uint8_t)sv.length() >= 4 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80 && ((uint8_t)sv[3] & 0xc0) == 0x80) {
+            char32_t cp = (char32_t)(((uint8_t)sv[0] & 0x7) << 18) | (char32_t)(((uint8_t)sv[1] & 0x3f) << 12) | (char32_t)(((uint8_t)sv[2] & 0x3f) << 6) | (char32_t)((uint8_t)sv[3] & 0x3f);
+
+            if (cp > 0x10ffff) {
+                *ptr = 0xfffd;
+                ptr++;
+
+                if (ptr == t.end())
+                    return;
+
+                sv = sv.substr(4);
+                continue;
+            }
+
+            cp -= 0x10000;
+
+            *ptr = (char16_t)(0xd800 | (cp >> 10));
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            *ptr = (char16_t)(0xdc00 | (cp & 0x3ff));
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            sv = sv.substr(4);
+        } else {
+            *ptr = 0xfffd;
+            ptr++;
+
+            if (ptr == t.end())
+                return;
+
+            sv = sv.substr(1);
+        }
+    }
+}
+
+template<typename T>
+requires (std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>) ||
+    (sizeof(wchar_t) == 2 && std::ranges::output_range<T, wchar_t> && std::is_same_v<std::ranges::range_value_t<T>, wchar_t>)
+static constexpr void utf8_to_utf16_range(std::u8string_view sv, T& t) noexcept {
+    utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
+}
+
+static __inline std::u16string utf8_to_utf16(std::string_view sv) {
+    if (sv.empty())
+        return u"";
+
+    std::u16string ret(utf8_to_utf16_len(sv), 0);
+
+    utf8_to_utf16_range(sv, ret);
+
+    return ret;
+}
+
+static __inline std::u16string utf8_to_utf16(std::u8string_view sv) {
+    if (sv.empty())
+        return u"";
+
+    std::u16string ret(utf8_to_utf16_len(sv), 0);
+
+    utf8_to_utf16_range(sv, ret);
 
     return ret;
 }

@@ -9,6 +9,8 @@
 #include <fmt/format.h>
 #include <fmt/compile.h>
 
+static const uint64_t CFBF_SIGNATURE = 0xe11ab1a1e011cfd0;
+
 class _formatted_error : public std::exception {
 public:
     template<typename T, typename... Args>
@@ -43,10 +45,11 @@ public:
 class cfbf {
 public:
     cfbf(const std::filesystem::path& fn);
+    cfbf(std::span<const uint8_t> s);
     uint32_t next_sector(uint32_t sector) const;
     uint32_t next_mini_sector(uint32_t sector) const;
     void parse_enc_info(std::span<const uint8_t> enc_info, std::u16string_view password);
-    void decrypt(std::span<uint8_t> enc_package);
+    std::vector<uint8_t> decrypt(std::span<uint8_t> enc_package);
 
     std::vector<cfbf_entry> entries;
     std::span<const uint8_t> s;

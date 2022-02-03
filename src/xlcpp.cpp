@@ -1,6 +1,8 @@
 #include "xlcpp.h"
 #include "xlcpp-pimpl.h"
 #include "mmap.h"
+#include "cfbf.h"
+#include "utf16.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <vector>
@@ -1837,7 +1839,7 @@ void workbook_pimpl::load_archive(struct archive* a) {
     parse_workbook(wb.first, wb.second.data, files);
 }
 
-workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
+workbook_pimpl::workbook_pimpl(const filesystem::path& fn, string_view password) {
 #ifdef _WIN32
     unique_handle hup{CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                                   FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -1854,14 +1856,60 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 
     auto mem = m.map();
 
-    load_from_memory(mem);
+    load_from_memory(mem, password);
 }
 
-workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
-    load_from_memory(sv);
+workbook_pimpl::workbook_pimpl(span<const uint8_t> sv, string_view password) {
+    load_from_memory(sv, password);
 }
 
-void workbook_pimpl::load_from_memory(span<const uint8_t> mem) {
+void workbook_pimpl::load_from_memory(span<const uint8_t> mem, string_view password) {
+    vector<uint8_t> plaintext;
+
+    if (mem.size() >= sizeof(uint64_t) && *(uint64_t*)mem.data() == CFBF_SIGNATURE) {
+        cfbf c(mem);
+        string enc_info, enc_package;
+
+        // FIXME - handle old-style Excel files
+
+        for (unsigned int num = 0; const auto& e : c.entries) {
+            if (num == 0) { // root
+                num++;
+                continue;
+            }
+
+            if (e.name == "/EncryptionInfo" || e.name == "/EncryptedPackage") {
+                auto& str = e.name == "/EncryptionInfo" ? enc_info : enc_package;
+
+                str.resize(e.get_size());
+
+                uint64_t off = 0;
+                auto buf = span((std::byte*)str.data(), str.size());
+
+                while (true) {
+                    auto size = e.read(buf, off);
+
+                    if (size == 0)
+                        break;
+
+                    off += size;
+                }
+            }
+
+            num++;
+        }
+
+        if (enc_info.empty())
+            throw runtime_error("EncryptionInfo not found.");
+
+        auto u16password = utf8_to_utf16(password);
+
+        c.parse_enc_info(span((uint8_t*)enc_info.data(), enc_info.size()), u16password);
+        plaintext = c.decrypt(span((uint8_t*)enc_package.data(), enc_package.size()));
+
+        mem = plaintext;
+    }
+
     archive_read_t a{archive_read_new()};
 
     archive_read_support_format_zip(a.get());
@@ -1874,12 +1922,12 @@ void workbook_pimpl::load_from_memory(span<const uint8_t> mem) {
     load_archive(a.get());
 }
 
-workbook::workbook(const filesystem::path& fn) {
-    impl = new workbook_pimpl(fn);
+workbook::workbook(const filesystem::path& fn, std::string_view password) {
+    impl = new workbook_pimpl(fn, password);
 }
 
-workbook::workbook(span<const uint8_t> sv) {
-    impl = new workbook_pimpl(sv);
+workbook::workbook(span<const uint8_t> sv, std::string_view password) {
+    impl = new workbook_pimpl(sv, password);
 }
 
 workbook::~workbook() {

@@ -20,7 +20,10 @@ add_definitions(-DXLCPP_EXPORT)
 set(SRC_FILES src/xlcpp.cpp
     src/xml-writer.cpp
     src/xml-reader.cpp
-    src/mmap.cpp)
+    src/mmap.cpp
+    src/cfbf.cpp
+    src/aes.cpp
+    src/sha1.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})

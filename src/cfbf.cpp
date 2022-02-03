@@ -7,7 +7,6 @@
 
 using namespace std;
 
-static const uint64_t CFBF_SIGNATURE = 0xe11ab1a1e011cfd0;
 static const uint32_t NOSTREAM = 0xffffffff;
 
 struct structured_storage_header {
@@ -72,7 +71,7 @@ static_assert(sizeof(dirent) == 0x80);
 
 cfbf::cfbf(const filesystem::path& fn) {
 #ifdef _WIN32
-    throw runtime_error("FIXME - Windows");
+    throw runtime_error("FIXME - Windows"); // FIXME
 #else
     unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
@@ -92,6 +91,20 @@ cfbf::cfbf(const filesystem::path& fn) {
 
     add_entry("", 0, false);
 #endif
+}
+
+cfbf::cfbf(span<const uint8_t> s) : s(s) {
+    auto& ssh = *(structured_storage_header*)s.data();
+
+    if (ssh.sig != CFBF_SIGNATURE)
+        throw runtime_error("Incorrect signature.");
+
+    auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
+
+    if (de.type != obj_type::STGTY_ROOT)
+        throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
+
+    add_entry("", 0, false);
 }
 
 const dirent& cfbf::find_dirent(uint32_t num) {
@@ -412,7 +425,7 @@ void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password)
     memcpy(this->salt.data(), salt.data(), this->salt.size());
 }
 
-void cfbf::decrypt(span<uint8_t> enc_package) {
+vector<uint8_t> cfbf::decrypt(span<uint8_t> enc_package) {
     if (enc_package.size() < sizeof(uint64_t))
         throw formatted_error("EncryptedPackage was {} bytes, expected at least {}", enc_package.size(), sizeof(uint64_t));
 
@@ -434,7 +447,9 @@ void cfbf::decrypt(span<uint8_t> enc_package) {
         buf = buf.subspan(16);
     }
 
-    ofstream f("plaintext");
+    vector<uint8_t> ret;
 
-    f.write((char*)enc_package.data(), enc_package.size()); // FIXME - throw exception if fails
+    ret.assign(enc_package.begin(), enc_package.end());
+
+    return ret;
 }

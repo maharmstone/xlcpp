@@ -73,8 +73,8 @@ bool operator==(const style& lhs, const style& rhs) noexcept;
 class workbook_pimpl {
 public:
     workbook_pimpl() = default;
-    workbook_pimpl(const std::filesystem::path& fn);
-    workbook_pimpl(std::span<const uint8_t> sv);
+    workbook_pimpl(const std::filesystem::path& fn, std::string_view password);
+    workbook_pimpl(std::span<const uint8_t> sv, std::string_view password);
     sheet& add_sheet(const std::string_view& name, bool visible);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
@@ -129,7 +129,7 @@ public:
 #endif
 
 private:
-    void load_from_memory(std::span<const uint8_t> sv);
+    void load_from_memory(std::span<const uint8_t> sv, std::string_view password);
 };
 
 class sheet_pimpl {

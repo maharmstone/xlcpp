@@ -39,8 +39,8 @@ class sheet;
 class XLCPP workbook {
 public:
     workbook();
-    workbook(const std::filesystem::path& fn);
-    workbook(std::span<const uint8_t> sv);
+    workbook(const std::filesystem::path& fn, std::string_view password = "");
+    workbook(std::span<const uint8_t> sv, std::string_view password = "");
     ~workbook();
     sheet& add_sheet(const std::string_view& name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
