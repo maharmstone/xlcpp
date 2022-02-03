@@ -69,30 +69,6 @@ struct dirent {
 
 static_assert(sizeof(dirent) == 0x80);
 
-cfbf::cfbf(const filesystem::path& fn) {
-#ifdef _WIN32
-    throw runtime_error("FIXME - Windows"); // FIXME
-#else
-    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
-
-    m = make_unique<mmap>(hup.get());
-
-    s = m->map();
-
-    auto& ssh = *(structured_storage_header*)s.data();
-
-    if (ssh.sig != CFBF_SIGNATURE)
-        throw runtime_error("Incorrect signature.");
-
-    auto& de = *(dirent*)(s.data() + (ssh.sect_dir_start + 1) * (1 << ssh.sector_shift));
-
-    if (de.type != obj_type::STGTY_ROOT)
-        throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
-
-    add_entry("", 0, false);
-#endif
-}
-
 cfbf::cfbf(span<const uint8_t> s) : s(s) {
     auto& ssh = *(structured_storage_header*)s.data();
 

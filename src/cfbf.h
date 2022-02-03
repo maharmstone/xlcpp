@@ -45,7 +45,6 @@ public:
 
 class cfbf {
 public:
-    cfbf(const std::filesystem::path& fn);
     cfbf(std::span<const uint8_t> s);
     uint32_t next_sector(uint32_t sector) const;
     uint32_t next_mini_sector(uint32_t sector) const;

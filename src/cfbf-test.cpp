@@ -5,7 +5,23 @@
 using namespace std;
 
 static void cfbf_test(const filesystem::path& fn) {
-    cfbf c(fn);
+#ifdef _WIN32
+    unique_handle hup{CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL, nullptr)};
+    if (hup.get() == INVALID_HANDLE_VALUE)
+        throw last_error("CreateFile", GetLastError());
+#else
+    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
+
+    if (hup.get() == -1)
+        throw formatted_error("open failed (errno = {})", errno);
+#endif
+
+    mmap m(hup.get());
+
+    auto mem = m.map();
+
+    cfbf c(mem);
     string enc_info, enc_package;
 
     for (unsigned int num = 0; const auto& e : c.entries) {
