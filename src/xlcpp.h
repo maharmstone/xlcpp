@@ -5,6 +5,7 @@
 #include <string>
 #include <list>
 #include <variant>
+#include <span>
 
 #ifdef _WIN32
 
@@ -39,7 +40,7 @@ class XLCPP workbook {
 public:
     workbook();
     workbook(const std::filesystem::path& fn);
-    workbook(const std::string_view& sv);
+    workbook(std::span<const uint8_t> sv);
 #ifdef _WIN32
     workbook(HANDLE h);
 #endif

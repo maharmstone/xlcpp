@@ -9,6 +9,7 @@
 #include <functional>
 #include <optional>
 #include <stack>
+#include <span>
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -72,7 +73,7 @@ class workbook_pimpl {
 public:
     workbook_pimpl() = default;
     workbook_pimpl(const std::filesystem::path& fn);
-    workbook_pimpl(const std::string_view& sv);
+    workbook_pimpl(std::span<const uint8_t> sv);
 #ifdef _WIN32
     workbook_pimpl(HANDLE h);
     ~workbook_pimpl();

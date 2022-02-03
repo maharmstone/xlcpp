@@ -1901,12 +1901,12 @@ workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 #endif
 }
 
-workbook_pimpl::workbook_pimpl(const string_view& sv) {
+workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
     archive_read_t a{archive_read_new()};
 
     archive_read_support_format_zip(a.get());
 
-    auto r = archive_read_open_memory(a.get(), sv.data(), sv.length());
+    auto r = archive_read_open_memory(a.get(), sv.data(), sv.size());
 
     if (r != ARCHIVE_OK)
         throw formatted_error("{}", archive_error_string(a.get()));
@@ -1953,7 +1953,7 @@ workbook::workbook(const filesystem::path& fn) {
     impl = new workbook_pimpl(fn);
 }
 
-workbook::workbook(const string_view& sv) {
+workbook::workbook(span<const uint8_t> sv) {
     impl = new workbook_pimpl(sv);
 }
 
