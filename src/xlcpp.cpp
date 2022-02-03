@@ -1,5 +1,6 @@
 #include "xlcpp.h"
 #include "xlcpp-pimpl.h"
+#include "mmap.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <vector>
@@ -1784,44 +1785,6 @@ __inline string utf16_to_utf8(const u16string_view& s) {
 
     return ret;
 }
-
-class last_error : public exception {
-public:
-    last_error(const string_view& function, int le) {
-        string nice_msg;
-
-        {
-            char16_t* fm;
-
-            if (FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-                le, 0, reinterpret_cast<LPWSTR>(&fm), 0, nullptr)) {
-                try {
-                    u16string_view s = fm;
-
-                    while (!s.empty() && (s[s.length() - 1] == u'\r' || s[s.length() - 1] == u'\n')) {
-                        s.remove_suffix(1);
-                    }
-
-                    nice_msg = utf16_to_utf8(s);
-                } catch (...) {
-                    LocalFree(fm);
-                    throw;
-                }
-
-                LocalFree(fm);
-            }
-        }
-
-        msg = string(function) + " failed (error " + to_string(le) + (!nice_msg.empty() ? (", " + nice_msg) : "") + ").";
-    }
-
-    const char* what() const noexcept {
-        return msg.c_str();
-    }
-
-private:
-    string msg;
-};
 #endif
 
 void workbook_pimpl::load_archive(struct archive* a) {
@@ -1876,29 +1839,31 @@ void workbook_pimpl::load_archive(struct archive* a) {
 
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn) {
 #ifdef _WIN32
-    h = CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE)
+    unique_handle hup{CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL, nullptr)};
+    if (hup.get() == INVALID_HANDLE_VALUE)
         throw last_error("CreateFile", GetLastError());
-
-    try {
-        new (this) workbook_pimpl(h);
-    } catch (...) {
-        CloseHandle(h);
-        throw;
-    }
 #else
+    unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
+
+    if (hup.get() == -1)
+        throw formatted_error("open failed (errno = {})", errno);
+#endif
+
+    mmap m(hup.get());
+
+    auto mem = m.map();
+
     archive_read_t a{archive_read_new()};
 
     archive_read_support_format_zip(a.get());
 
-    auto r = archive_read_open_filename(a.get(), fn.string().c_str(), BLOCK_SIZE);
+    auto r = archive_read_open_memory(a.get(), mem.data(), mem.size());
 
     if (r != ARCHIVE_OK)
         throw formatted_error("{}", archive_error_string(a.get()));
 
     load_archive(a.get());
-#endif
 }
 
 workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
@@ -1914,41 +1879,6 @@ workbook_pimpl::workbook_pimpl(span<const uint8_t> sv) {
     load_archive(a.get());
 }
 
-#ifdef _WIN32
-workbook_pimpl::workbook_pimpl(HANDLE h) {
-    archive_read_t a{archive_read_new()};
-
-    archive_read_support_format_zip(a.get());
-
-    this->h2 = h;
-
-    auto r = archive_read_open(a.get(), this, archive_dummy_callback,
-                                [](struct archive* a, void* client_data, const void** buffer) -> la_ssize_t {
-                                    auto impl = (workbook_pimpl*)client_data;
-                                    DWORD read;
-
-                                    if (!ReadFile(impl->h2, impl->readbuf, sizeof(impl->readbuf), &read, nullptr)) {
-                                        archive_set_error(a, -5, "ReadFile failed (error %lu)", GetLastError());
-                                        return -1;
-                                    }
-
-                                    *buffer = impl->readbuf;
-
-                                    return read;
-                                }, archive_dummy_callback);
-
-    if (r != ARCHIVE_OK)
-        throw formatted_error("{}", archive_error_string(a.get()));
-
-    load_archive(a.get());
-}
-
-workbook_pimpl::~workbook_pimpl() {
-    if (h != INVALID_HANDLE_VALUE)
-        CloseHandle(h);
-}
-#endif
-
 workbook::workbook(const filesystem::path& fn) {
     impl = new workbook_pimpl(fn);
 }
@@ -1956,12 +1886,6 @@ workbook::workbook(const filesystem::path& fn) {
 workbook::workbook(span<const uint8_t> sv) {
     impl = new workbook_pimpl(sv);
 }
-
-#ifdef _WIN32
-workbook::workbook(HANDLE h) {
-    impl = new workbook_pimpl(h);
-}
-#endif
 
 workbook::~workbook() {
     delete impl;
@@ -2106,7 +2030,7 @@ void workbook_pimpl::rename(const filesystem::path& fn) const {
     memcpy(fri->FileName, dest.data(), fri->FileNameLength);
     fri->FileName[dest.length()] = 0;
 
-    if (!SetFileInformationByHandle(h, FileRenameInfo, fri, (DWORD)buf.size()))
+    if (!SetFileInformationByHandle(h.get(), FileRenameInfo, fri, (DWORD)buf.size()))
         throw last_error("SetFileInformationByHandle", GetLastError());
 }
 

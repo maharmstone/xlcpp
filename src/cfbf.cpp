@@ -71,6 +71,9 @@ struct dirent {
 static_assert(sizeof(dirent) == 0x80);
 
 cfbf::cfbf(const filesystem::path& fn) {
+#ifdef _WIN32
+    throw runtime_error("FIXME - Windows");
+#else
     unique_handle hup{open(fn.string().c_str(), O_RDONLY)};
 
     m = make_unique<mmap>(hup.get());
@@ -88,6 +91,7 @@ cfbf::cfbf(const filesystem::path& fn) {
         throw runtime_error("Root directory entry did not have type STGTY_ROOT.");
 
     add_entry("", 0, false);
+#endif
 }
 
 const dirent& cfbf::find_dirent(uint32_t num) {

@@ -41,9 +41,6 @@ public:
     workbook();
     workbook(const std::filesystem::path& fn);
     workbook(std::span<const uint8_t> sv);
-#ifdef _WIN32
-    workbook(HANDLE h);
-#endif
     ~workbook();
     sheet& add_sheet(const std::string_view& name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
