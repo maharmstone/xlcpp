@@ -401,7 +401,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                 found_root = true;
             } else {
                 if (r.local_name() == "keyData" && r.namespace_uri_raw().cmp(NS_ENCRYPTION)) {
-                    string salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining;
+                    string salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm;
                     unsigned int key_bits;
 
                     r.attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
@@ -415,6 +415,8 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                             key_bits_str = value_raw.decode();
                         else if (local_name == "cipherChaining")
                             cipher_chaining = value_raw.decode();
+                        else if (local_name == "hashAlgorithm")
+                            hash_algorithm = value_raw.decode();
 
                         return true;
                     });
@@ -430,6 +432,9 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     if (cipher_chaining.empty())
                         throw runtime_error("cipherChaining not set");
+
+                    if (hash_algorithm.empty())
+                        throw runtime_error("hashAlgorithm not set");
 
                     auto salt_value = b64decode(salt_value_b64);
 
@@ -448,6 +453,9 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     if (cipher_chaining != "ChainingModeCBC")
                         throw formatted_error("cipherChaining was {}, expected ChainingModeCBC", cipher_chaining);
+
+                    if (hash_algorithm != "SHA1")
+                        throw formatted_error("hashAlgorithm was {}, expected SHA1", hash_algorithm);
 
                     memcpy(salt.data(), salt_value.data(), min(salt_value.size(), salt.size()));
                     found_key_data = true;
@@ -586,8 +594,13 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (memcmp(hash.data(), verifier_hash.data(), hash.size()))
                         throw runtime_error("Incorrect password.");
 
-                    auto key = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3);
-                    this->key = key;
+                    auto key3 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3);
+
+                    AES_init_ctx_iv(&ctx, key3.data(), iv.data());
+
+                    AES_CBC_decrypt_buffer(&ctx, (uint8_t*)encrypted_key_value.data(), encrypted_key_value.size());
+
+                    memcpy(key.data(), encrypted_key_value.data(), key.size());
 
                     found_password = true;
                 }
@@ -600,6 +613,8 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
     if (!found_password)
         throw runtime_error("encryptedKey not found");
+
+    agile_enc = true;
 }
 
 void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password) {
@@ -670,6 +685,46 @@ void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password)
     memcpy(this->salt.data(), salt.data(), this->salt.size());
 }
 
+vector<uint8_t> cfbf::decrypt44(span<uint8_t> enc_package) {
+    uint32_t segment_no = 0;
+    vector<uint8_t> ret;
+
+    static const size_t SEGMENT_LENGTH = 0x1000;
+
+    ret.resize(enc_package.size());
+    auto ptr = ret.data();
+
+    while (true) {
+        array<uint8_t, 20> h;
+        AES_ctx ctx;
+
+        auto seg = enc_package.subspan(0, min(SEGMENT_LENGTH, enc_package.size()));
+
+        {
+            SHA1_CTX ctx;
+
+            ctx.update(salt);
+            ctx.update(span((uint8_t*)&segment_no, sizeof(segment_no)));
+
+            ctx.finalize(h);
+        }
+
+        AES_init_ctx_iv(&ctx, key.data(), h.data());
+
+        memcpy(ptr, seg.data(), seg.size());
+        AES_CBC_decrypt_buffer(&ctx, ptr, seg.size());
+
+        if (enc_package.size() == seg.size())
+            break;
+
+        enc_package = enc_package.subspan(seg.size());
+        segment_no++;
+        ptr += seg.size();
+    }
+
+    return ret;
+}
+
 vector<uint8_t> cfbf::decrypt(span<uint8_t> enc_package) {
     if (enc_package.size() < sizeof(uint64_t))
         throw formatted_error("EncryptedPackage was {} bytes, expected at least {}", enc_package.size(), sizeof(uint64_t));
@@ -680,6 +735,9 @@ vector<uint8_t> cfbf::decrypt(span<uint8_t> enc_package) {
 
     if (enc_package.size() < size)
         throw formatted_error("EncryptedPackage was {} bytes, expected at least {}", enc_package.size() + sizeof(uint64_t), size + sizeof(uint64_t));
+
+    if (agile_enc)
+        return decrypt44(enc_package);
 
     AES_ctx ctx;
     auto buf = enc_package;
