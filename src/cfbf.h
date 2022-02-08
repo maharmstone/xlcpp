@@ -49,6 +49,7 @@ public:
     uint32_t next_sector(uint32_t sector) const;
     uint32_t next_mini_sector(uint32_t sector) const;
     void parse_enc_info(std::span<const uint8_t> enc_info, std::u16string_view password);
+    void parse_enc_info_44(std::span<const uint8_t> enc_info, std::u16string_view password);
     std::vector<uint8_t> decrypt(std::span<uint8_t> enc_package);
 
     std::vector<cfbf_entry> entries;

@@ -4,6 +4,7 @@
 #include "utf16.h"
 #include "sha1.h"
 #include "aes.h"
+#include "xlcpp-pimpl.h"
 
 using namespace std;
 
@@ -336,13 +337,33 @@ void cfbf::check_password(u16string_view password, span<const uint8_t> salt,
     this->key = key;
 }
 
+void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view password) {
+    enc_info = enc_info.subspan(sizeof(uint32_t));
+
+    if (enc_info.size() < sizeof(uint32_t) || *(uint32_t*)enc_info.data() != 0x40)
+        throw runtime_error("EncryptionInfo reserved value was not 0x40.");
+
+    enc_info = enc_info.subspan(sizeof(uint32_t));
+
+    xml_reader r(string_view((char*)enc_info.data(), enc_info.size()));
+
+    while (r.read()) {
+        fmt::print("node = {}\n", r.node_type());
+
+        // FIXME
+    }
+}
+
 void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password) {
     if (enc_info.size() < sizeof(encryption_info))
         throw formatted_error("EncryptionInfo was {} bytes, expected at least {}", enc_info.size(), sizeof(encryption_info));
 
     auto& ei = *(encryption_info*)enc_info.data();
 
-    if (ei.major != 3 || ei.minor != 2)
+    if (ei.major == 4 && ei.minor == 4) {
+        parse_enc_info_44(enc_info, password);
+        return;
+    } else if (ei.major != 3 || ei.minor != 2)
         throw formatted_error("Unsupported EncryptionInfo version {}.{}", ei.major, ei.minor);
 
     if (ei.flags != 0x24) // AES
