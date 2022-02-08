@@ -389,11 +389,9 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
     xml_reader r(string_view((char*)enc_info.data(), enc_info.size()));
 
-    bool found_root = false;
+    bool found_root = false, found_key_data = false, found_password = false;
 
     while (r.read()) {
-        fmt::print("node = {} ({{{}}}{})\n", r.node_type(), r.namespace_uri_raw().decode(), r.local_name());
-
         if (r.node_type() == xml_node::element) {
             if (!found_root) {
                 if (r.local_name() != "encryption" || !r.namespace_uri_raw().cmp(NS_ENCRYPTION))
@@ -402,9 +400,58 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                 found_root = true;
             } else {
-                // FIXME - keyData (cipherAlgorithm, hashAlgorithm, saltValue, keyBits, cipherChaining)
+                if (r.local_name() == "keyData" && r.namespace_uri_raw().cmp(NS_ENCRYPTION)) {
+                    string salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining;
+                    unsigned int key_bits;
 
-                if (r.local_name() == "encryptedKey" && r.namespace_uri_raw().cmp(NS_PASSWORD)) {
+                    r.attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+                                              const xml_enc_string_view& value_raw) {
+
+                        if (local_name == "saltValue")
+                            salt_value_b64 = value_raw.decode();
+                        else if (local_name == "cipherAlgorithm")
+                            cipher_algorithm = value_raw.decode();
+                        else if (local_name == "keyBits")
+                            key_bits_str = value_raw.decode();
+                        else if (local_name == "cipherChaining")
+                            cipher_chaining = value_raw.decode();
+
+                        return true;
+                    });
+
+                    if (salt_value_b64.empty())
+                        throw runtime_error("saltValue not set");
+
+                    if (cipher_algorithm.empty())
+                        throw runtime_error("cipherAlgorithm not set");
+
+                    if (key_bits_str.empty())
+                        throw runtime_error("keyBits not set");
+
+                    if (cipher_chaining.empty())
+                        throw runtime_error("cipherChaining not set");
+
+                    auto salt_value = b64decode(salt_value_b64);
+
+                    if (cipher_algorithm != "AES")
+                        throw formatted_error("cipherAlgorithm was {}, expected AES", cipher_algorithm);
+
+                    {
+                        auto [ptr, ec] = from_chars(key_bits_str.data(), key_bits_str.data() + key_bits_str.size(), key_bits);
+
+                        if (ptr != key_bits_str.data() + key_bits_str.size())
+                            throw formatted_error("Could not convert \"{}\" to integer.", key_bits_str);
+                    }
+
+                    if (key_bits != 128)
+                        throw formatted_error("keyBits was {}, expected 128", key_bits);
+
+                    if (cipher_chaining != "ChainingModeCBC")
+                        throw formatted_error("cipherChaining was {}, expected ChainingModeCBC", cipher_chaining);
+
+                    memcpy(salt.data(), salt_value.data(), min(salt_value.size(), salt.size()));
+                    found_key_data = true;
+                } else if (r.local_name() == "encryptedKey" && r.namespace_uri_raw().cmp(NS_PASSWORD)) {
                     string spin_count_str, salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm,
                            encrypted_verifier_hash_input_b64, encrypted_verifier_hash_value_b64, encrypted_key_value_b64;
                     unsigned int spin_count, key_bits;
@@ -497,6 +544,9 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     static const array<uint8_t, 8> block1 = { 0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79 };
                     static const array<uint8_t, 8> block2 = { 0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e };
+                    static const array<uint8_t, 8> block3 = { 0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd6 };
+
+                    // FIXME - we can save time by saving the partial hash for key1, key2, and key
 
                     auto key1 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block1);
 
@@ -536,12 +586,20 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (memcmp(hash.data(), verifier_hash.data(), hash.size()))
                         throw runtime_error("Incorrect password.");
 
-//                     this->key = key;
+                    auto key = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3);
+                    this->key = key;
+
+                    found_password = true;
                 }
             }
         }
-        // FIXME
     }
+
+    if (!found_key_data)
+        throw runtime_error("keyData not found");
+
+    if (!found_password)
+        throw runtime_error("encryptedKey not found");
 }
 
 void cfbf::parse_enc_info(span<const uint8_t> enc_info, u16string_view password) {
