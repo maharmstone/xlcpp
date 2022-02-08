@@ -1,5 +1,6 @@
 #include <fmt/format.h>
 #include <fstream>
+#include <charconv>
 #include "cfbf.h"
 #include "utf16.h"
 #include "sha1.h"
@@ -366,20 +367,21 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                 // FIXME - keyData (cipherAlgorithm, hashAlgorithm, saltValue, keyBits, cipherChaining)
 
                 if (r.local_name() == "encryptedKey" && r.namespace_uri_raw().cmp(NS_PASSWORD)) {
-                    string spin_count, salt_value, cipher_algorithm, key_bits, cipher_chaining, hash_algorithm,
+                    string spin_count_str, salt_value, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm,
                            encrypted_verifier_hash_input, encrypted_verifier_hash_value, encrypted_key_value;
+                    unsigned int spin_count, key_bits;
 
                     r.attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
                                               const xml_enc_string_view& value_raw) {
 
                         if (local_name == "spinCount")
-                            spin_count = value_raw.decode();
+                            spin_count_str = value_raw.decode();
                         else if (local_name == "saltValue")
                             salt_value = value_raw.decode();
                         else if (local_name == "cipherAlgorithm")
                             cipher_algorithm = value_raw.decode();
                         else if (local_name == "keyBits")
-                            key_bits = value_raw.decode();
+                            key_bits_str = value_raw.decode();
                         else if (local_name == "cipherChaining")
                             cipher_chaining = value_raw.decode();
                         else if (local_name == "hashAlgorithm")
@@ -394,7 +396,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                         return true;
                     });
 
-                    if (spin_count.empty())
+                    if (spin_count_str.empty())
                         throw runtime_error("spinCount not set");
 
                     if (salt_value.empty())
@@ -403,7 +405,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (cipher_algorithm.empty())
                         throw runtime_error("cipherAlgorithm not set");
 
-                    if (key_bits.empty())
+                    if (key_bits_str.empty())
                         throw runtime_error("keyBits not set");
 
                     if (cipher_chaining.empty())
@@ -421,13 +423,27 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (encrypted_key_value.empty())
                         throw runtime_error("encryptedKeyValue not set");
 
-                    // FIXME - spin_count to int
+                    {
+                        auto [ptr, ec] = from_chars(spin_count_str.data(), spin_count_str.data() + spin_count_str.size(), spin_count);
+
+                        if (ptr != spin_count_str.data() + spin_count_str.size())
+                            throw formatted_error("Could not convert \"{}\" to integer.", spin_count_str);
+                    }
+
                     // FIXME - base64 decode salt_value
 
                     if (cipher_algorithm != "AES")
                         throw formatted_error("cipherAlgorithm was {}, expected AES", cipher_algorithm);
 
-                    // FIXME - key_bits to int (and check is 16)
+                    {
+                        auto [ptr, ec] = from_chars(key_bits_str.data(), key_bits_str.data() + key_bits_str.size(), key_bits);
+
+                        if (ptr != key_bits_str.data() + key_bits_str.size())
+                            throw formatted_error("Could not convert \"{}\" to integer.", key_bits_str);
+                    }
+
+                    if (key_bits != 128)
+                        throw formatted_error("keyBits was {}, expected 128", key_bits);
 
                     if (cipher_chaining != "ChainingModeCBC")
                         throw formatted_error("cipherChaining was {}, expected ChainingModeCBC", cipher_chaining);
