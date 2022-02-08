@@ -267,6 +267,43 @@ static array<uint8_t, 16> generate_key(u16string_view password, span<const uint8
     return ret;
 }
 
+static array<uint8_t, 16> generate_key44(u16string_view password, span<const uint8_t> salt, unsigned int spin_count,
+                                         span<const uint8_t> block_key) {
+    array<uint8_t, 20> h;
+
+    {
+        SHA1_CTX ctx;
+
+        ctx.update(salt);
+        ctx.update(span((uint8_t*)password.data(), password.size() * sizeof(char16_t)));
+
+        ctx.finalize(h);
+    }
+
+    for (uint32_t i = 0; i < spin_count; i++) {
+        SHA1_CTX ctx;
+
+        ctx.update(span((uint8_t*)&i, sizeof(uint32_t)));
+        ctx.update(h);
+
+        ctx.finalize(h);
+    }
+
+    {
+        SHA1_CTX ctx;
+
+        ctx.update(h);
+        ctx.update(block_key);
+
+        ctx.finalize(h);
+    }
+
+    array<uint8_t, 16> ret;
+    memcpy(ret.data(), h.data(), h.size());
+
+    return ret;
+}
+
 #pragma pack(push, 1)
 
 struct encryption_info {
@@ -458,7 +495,48 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     auto encrypted_key_value = b64decode(encrypted_key_value_b64);
 
-                    // FIXME - check password
+                    static const array<uint8_t, 8> block1 = { 0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79 };
+                    static const array<uint8_t, 8> block2 = { 0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e };
+
+                    auto key1 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block1);
+
+                    AES_ctx ctx;
+                    array<uint8_t, 16> verifier;
+                    array<uint8_t, 32> verifier_hash;
+
+                    if (encrypted_verifier_hash_input.size() != verifier.size())
+                        throw formatted_error("encrypted_verifier_hash_input.size() was {}, expected {}", encrypted_verifier_hash_input.size(), verifier.size());
+
+                    if (encrypted_verifier_hash_value.size() != verifier_hash.size())
+                        throw formatted_error("encrypted_verifier_hash_value.size() was {}, expected {}", encrypted_verifier_hash_value.size(), verifier_hash.size());
+
+                    array<uint8_t, 16> iv;
+
+                    memcpy(iv.data(), salt_value.data(), min(salt_value.size(), sizeof(iv)));
+
+                    if (salt_value.size() < sizeof(iv))
+                        memset(&iv[salt_value.size()], 0, sizeof(iv) - salt_value.size());
+
+                    AES_init_ctx_iv(&ctx, key1.data(), iv.data());
+
+                    memcpy(verifier.data(), encrypted_verifier_hash_input.data(), encrypted_verifier_hash_input.size());
+
+                    AES_CBC_decrypt_buffer(&ctx, verifier.data(), verifier.size());
+
+                    memcpy(verifier_hash.data(), encrypted_verifier_hash_value.data(), encrypted_verifier_hash_value.size());
+
+                    auto key2 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block2);
+
+                    AES_init_ctx_iv(&ctx, key2.data(), iv.data());
+
+                    AES_CBC_decrypt_buffer(&ctx, verifier_hash.data(), verifier_hash.size());
+
+                    auto hash = sha1(verifier);
+
+                    if (memcmp(hash.data(), verifier_hash.data(), hash.size()))
+                        throw runtime_error("Incorrect password.");
+
+//                     this->key = key;
                 }
             }
         }

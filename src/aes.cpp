@@ -35,6 +35,7 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 /* Includes:                                                                 */
 /*****************************************************************************/
 #include "aes.h"
+#include <string.h>
 
 /*****************************************************************************/
 /* Defines:                                                                  */
@@ -151,6 +152,11 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key) {
 
 void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key) {
     KeyExpansion(ctx->RoundKey, key);
+}
+
+void AES_init_ctx_iv(struct AES_ctx* ctx, const uint8_t* key, const uint8_t* iv) {
+    KeyExpansion(ctx->RoundKey, key);
+    memcpy(ctx->Iv, iv, AES_BLOCKLEN);
 }
 
 // This function adds the round key to state.
@@ -366,4 +372,35 @@ void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf) {
 void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf) {
   // The next function call decrypts the PlainText with the Key using AES algorithm.
   InvCipher(*(state_t*)buf, ctx->RoundKey);
+}
+
+static void XorWithIv(uint8_t* buf, const uint8_t* Iv) {
+    for (uint8_t i = 0; i < AES_BLOCKLEN; i++) { // The block in AES is always 128bit no matter the key size
+        buf[i] ^= Iv[i];
+    }
+}
+
+void AES_CBC_encrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, size_t length) {
+    auto Iv = ctx->Iv;
+
+    for (size_t i = 0; i < length; i += AES_BLOCKLEN) {
+        XorWithIv(buf, Iv);
+        Cipher(*(state_t*)buf, ctx->RoundKey);
+        Iv = buf;
+        buf += AES_BLOCKLEN;
+    }
+    /* store Iv in ctx for next call */
+    memcpy(ctx->Iv, Iv, AES_BLOCKLEN);
+}
+
+void AES_CBC_decrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, size_t length) {
+    uint8_t storeNextIv[AES_BLOCKLEN];
+
+    for (size_t i = 0; i < length; i += AES_BLOCKLEN) {
+        memcpy(storeNextIv, buf, AES_BLOCKLEN);
+        InvCipher(*(state_t*)buf, ctx->RoundKey);
+        XorWithIv(buf, ctx->Iv);
+        memcpy(ctx->Iv, storeNextIv, AES_BLOCKLEN);
+        buf += AES_BLOCKLEN;
+    }
 }
