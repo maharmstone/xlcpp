@@ -23,7 +23,8 @@ set(SRC_FILES src/xlcpp.cpp
     src/mmap.cpp
     src/cfbf.cpp
     src/aes.cpp
-    src/sha1.cpp)
+    src/sha1.cpp
+    src/b64.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})
@@ -65,7 +66,7 @@ if(BUILD_SAMPLE)
     install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
 
     # TESTING
-    add_executable(cfbf src/cfbf.cpp src/mmap.cpp src/sha1.cpp src/aes.cpp src/cfbf-test.cpp src/xml-reader.cpp)
+    add_executable(cfbf src/cfbf.cpp src/mmap.cpp src/sha1.cpp src/aes.cpp src/cfbf-test.cpp src/xml-reader.cpp src/b64.cpp)
     target_include_directories(cfbf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(cfbf xlcpp)
     install(TARGETS cfbf DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")

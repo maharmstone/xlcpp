@@ -5,6 +5,7 @@
 #include "utf16.h"
 #include "sha1.h"
 #include "aes.h"
+#include "b64.h"
 #include "xlcpp-pimpl.h"
 
 using namespace std;
@@ -367,8 +368,8 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                 // FIXME - keyData (cipherAlgorithm, hashAlgorithm, saltValue, keyBits, cipherChaining)
 
                 if (r.local_name() == "encryptedKey" && r.namespace_uri_raw().cmp(NS_PASSWORD)) {
-                    string spin_count_str, salt_value, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm,
-                           encrypted_verifier_hash_input, encrypted_verifier_hash_value, encrypted_key_value;
+                    string spin_count_str, salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm,
+                           encrypted_verifier_hash_input_b64, encrypted_verifier_hash_value_b64, encrypted_key_value_b64;
                     unsigned int spin_count, key_bits;
 
                     r.attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
@@ -377,7 +378,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                         if (local_name == "spinCount")
                             spin_count_str = value_raw.decode();
                         else if (local_name == "saltValue")
-                            salt_value = value_raw.decode();
+                            salt_value_b64 = value_raw.decode();
                         else if (local_name == "cipherAlgorithm")
                             cipher_algorithm = value_raw.decode();
                         else if (local_name == "keyBits")
@@ -387,11 +388,11 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                         else if (local_name == "hashAlgorithm")
                             hash_algorithm = value_raw.decode();
                         else if (local_name == "encryptedVerifierHashInput")
-                            encrypted_verifier_hash_input = value_raw.decode();
+                            encrypted_verifier_hash_input_b64 = value_raw.decode();
                         else if (local_name == "encryptedVerifierHashValue")
-                            encrypted_verifier_hash_value = value_raw.decode();
+                            encrypted_verifier_hash_value_b64 = value_raw.decode();
                         else if (local_name == "encryptedKeyValue")
-                            encrypted_key_value = value_raw.decode();
+                            encrypted_key_value_b64 = value_raw.decode();
 
                         return true;
                     });
@@ -399,7 +400,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (spin_count_str.empty())
                         throw runtime_error("spinCount not set");
 
-                    if (salt_value.empty())
+                    if (salt_value_b64.empty())
                         throw runtime_error("saltValue not set");
 
                     if (cipher_algorithm.empty())
@@ -414,13 +415,13 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (hash_algorithm.empty())
                         throw runtime_error("hashAlgorithm not set");
 
-                    if (encrypted_verifier_hash_input.empty())
+                    if (encrypted_verifier_hash_input_b64.empty())
                         throw runtime_error("encryptedVerifierHashInput not set");
 
-                    if (encrypted_verifier_hash_value.empty())
+                    if (encrypted_verifier_hash_value_b64.empty())
                         throw runtime_error("encryptedVerifierHashValue not set");
 
-                    if (encrypted_key_value.empty())
+                    if (encrypted_key_value_b64.empty())
                         throw runtime_error("encryptedKeyValue not set");
 
                     {
@@ -430,7 +431,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                             throw formatted_error("Could not convert \"{}\" to integer.", spin_count_str);
                     }
 
-                    // FIXME - base64 decode salt_value
+                    auto salt_value = b64decode(salt_value_b64);
 
                     if (cipher_algorithm != "AES")
                         throw formatted_error("cipherAlgorithm was {}, expected AES", cipher_algorithm);
@@ -451,9 +452,11 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (hash_algorithm != "SHA1")
                         throw formatted_error("hashAlgorithm was {}, expected SHA1", hash_algorithm);
 
-                    // FIXME - base64 decode encrypted_verifier_hash_input
-                    // FIXME - base64 decode encrypted_verifier_hash_value
-                    // FIXME - base64 decode encrypted_key_value
+                    auto encrypted_verifier_hash_input = b64decode(encrypted_verifier_hash_input_b64);
+
+                    auto encrypted_verifier_hash_value = b64decode(encrypted_verifier_hash_value_b64);
+
+                    auto encrypted_key_value = b64decode(encrypted_key_value_b64);
 
                     // FIXME - check password
                 }
