@@ -70,6 +70,9 @@ struct dirent {
 
 static_assert(sizeof(dirent) == 0x80);
 
+static const string_view NS_ENCRYPTION = "http://schemas.microsoft.com/office/2006/encryption";
+static const string_view NS_PASSWORD = "http://schemas.microsoft.com/office/2006/keyEncryptor/password";
+
 cfbf::cfbf(span<const uint8_t> s) : s(s) {
     auto& ssh = *(structured_storage_header*)s.data();
 
@@ -207,7 +210,7 @@ size_t cfbf_entry::get_size() const {
     return de.size;
 }
 
-static array<uint8_t, 16> generate_key(u16string_view password, span<const uint8_t> salt) {
+static array<uint8_t, 16> generate_key(u16string_view password, span<const uint8_t> salt, unsigned int spin_count) {
     array<uint8_t, 20> h;
 
     {
@@ -219,7 +222,7 @@ static array<uint8_t, 16> generate_key(u16string_view password, span<const uint8
         ctx.finalize(h);
     }
 
-    for (uint32_t i = 0; i < 50000; i++) {
+    for (uint32_t i = 0; i < spin_count; i++) {
         SHA1_CTX ctx;
 
         ctx.update(span((uint8_t*)&i, sizeof(uint32_t)));
@@ -291,7 +294,7 @@ static const uint32_t ALG_ID_SHA_1 = 0x8004;
 void cfbf::check_password(u16string_view password, span<const uint8_t> salt,
                           span<const uint8_t> encrypted_verifier,
                           span<const uint8_t> encrypted_verifier_hash) {
-    auto key = generate_key(password, salt);
+    auto key = generate_key(password, salt, 50000);
     AES_ctx ctx;
     array<uint8_t, 16> verifier;
     array<uint8_t, 32> verifier_hash;
@@ -347,9 +350,99 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
     xml_reader r(string_view((char*)enc_info.data(), enc_info.size()));
 
-    while (r.read()) {
-        fmt::print("node = {}\n", r.node_type());
+    bool found_root = false;
 
+    while (r.read()) {
+        fmt::print("node = {} ({{{}}}{})\n", r.node_type(), r.namespace_uri_raw().decode(), r.local_name());
+
+        if (r.node_type() == xml_node::element) {
+            if (!found_root) {
+                if (r.local_name() != "encryption" || !r.namespace_uri_raw().cmp(NS_ENCRYPTION))
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}encryption.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_ENCRYPTION);
+
+                found_root = true;
+            } else {
+                // FIXME - keyData (cipherAlgorithm, hashAlgorithm, saltValue, keyBits, cipherChaining)
+
+                if (r.local_name() == "encryptedKey" && r.namespace_uri_raw().cmp(NS_PASSWORD)) {
+                    string spin_count, salt_value, cipher_algorithm, key_bits, cipher_chaining, hash_algorithm,
+                           encrypted_verifier_hash_input, encrypted_verifier_hash_value, encrypted_key_value;
+
+                    r.attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+                                              const xml_enc_string_view& value_raw) {
+
+                        if (local_name == "spinCount")
+                            spin_count = value_raw.decode();
+                        else if (local_name == "saltValue")
+                            salt_value = value_raw.decode();
+                        else if (local_name == "cipherAlgorithm")
+                            cipher_algorithm = value_raw.decode();
+                        else if (local_name == "keyBits")
+                            key_bits = value_raw.decode();
+                        else if (local_name == "cipherChaining")
+                            cipher_chaining = value_raw.decode();
+                        else if (local_name == "hashAlgorithm")
+                            hash_algorithm = value_raw.decode();
+                        else if (local_name == "encryptedVerifierHashInput")
+                            encrypted_verifier_hash_input = value_raw.decode();
+                        else if (local_name == "encryptedVerifierHashValue")
+                            encrypted_verifier_hash_value = value_raw.decode();
+                        else if (local_name == "encryptedKeyValue")
+                            encrypted_key_value = value_raw.decode();
+
+                        return true;
+                    });
+
+                    if (spin_count.empty())
+                        throw runtime_error("spinCount not set");
+
+                    if (salt_value.empty())
+                        throw runtime_error("saltValue not set");
+
+                    if (cipher_algorithm.empty())
+                        throw runtime_error("cipherAlgorithm not set");
+
+                    if (key_bits.empty())
+                        throw runtime_error("keyBits not set");
+
+                    if (cipher_chaining.empty())
+                        throw runtime_error("cipherChaining not set");
+
+                    if (hash_algorithm.empty())
+                        throw runtime_error("hashAlgorithm not set");
+
+                    if (encrypted_verifier_hash_input.empty())
+                        throw runtime_error("encryptedVerifierHashInput not set");
+
+                    if (encrypted_verifier_hash_value.empty())
+                        throw runtime_error("encryptedVerifierHashValue not set");
+
+                    if (encrypted_key_value.empty())
+                        throw runtime_error("encryptedKeyValue not set");
+
+                    // FIXME - spin_count to int
+                    // FIXME - base64 decode salt_value
+
+                    if (cipher_algorithm != "AES")
+                        throw formatted_error("cipherAlgorithm was {}, expected AES", cipher_algorithm);
+
+                    // FIXME - key_bits to int (and check is 16)
+
+                    if (cipher_chaining != "ChainingModeCBC")
+                        throw formatted_error("cipherChaining was {}, expected ChainingModeCBC", cipher_chaining);
+
+                    if (hash_algorithm != "SHA1")
+                        throw formatted_error("hashAlgorithm was {}, expected SHA1", hash_algorithm);
+
+                    // FIXME - base64 decode encrypted_verifier_hash_input
+                    // FIXME - base64 decode encrypted_verifier_hash_value
+                    // FIXME - base64 decode encrypted_key_value
+
+                    // FIXME - check password
+                }
+            }
+        }
         // FIXME
     }
 }
