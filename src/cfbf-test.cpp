@@ -140,13 +140,18 @@ static void test_key() {
 }
 #endif
 
-int main() {
+int main(int argc, char* argv[]) {
     test_sha1();
+
+    if (argc < 2) {
+        fmt::print(stderr, "No filename given.\n");
+        return 1;
+    }
 
 //     test_key();
 
     try {
-        cfbf_test("../password.xlsx");
+        cfbf_test(argv[1]);
     } catch (const exception& e) {
         fmt::print(stderr, "{}\n", e.what());
         return 1;
