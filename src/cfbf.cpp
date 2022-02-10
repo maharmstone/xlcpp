@@ -574,7 +574,11 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (cipher_chaining != "ChainingModeCBC")
                         throw formatted_error("cipherChaining was {}, expected ChainingModeCBC", cipher_chaining);
 
-                    if (hash_algorithm != "SHA1" && hash_algorithm != "SHA512")
+                    if (hash_algorithm == "SHA1")
+                        hashalgo = hash_algorithm::sha1;
+                    else if (hash_algorithm == "SHA512")
+                        hashalgo = hash_algorithm::sha512;
+                    else
                         throw formatted_error("hashAlgorithm was {}, expected SHA1 or SHA512", hash_algorithm);
 
                     auto encrypted_verifier_hash_input = b64decode(encrypted_verifier_hash_input_b64);
@@ -591,7 +595,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     array<uint8_t, 64> key1, key2, key3;
 
-                    if (hash_algorithm == "SHA512")
+                    if (hashalgo == hash_algorithm::sha512)
                         generate_key44_sha512(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block1, key1);
                     else
                         generate_key44_sha1(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block1, key1);
@@ -627,7 +631,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     memcpy(verifier_hash.data(), encrypted_verifier_hash_value.data(), encrypted_verifier_hash_value.size());
 
-                    if (hash_algorithm == "SHA512")
+                    if (hashalgo == hash_algorithm::sha512)
                         generate_key44_sha512(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block2, key2);
                     else
                         generate_key44_sha1(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block2, key2);
@@ -640,7 +644,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                         AES128_CBC_decrypt_buffer(&ctx, verifier_hash.data(), verifier_hash.size());
                     }
 
-                    if (hash_algorithm == "SHA512") {
+                    if (hashalgo == hash_algorithm::sha512) {
                         array<uint8_t, 64> hash;
                         sha512_state ctx;
 
@@ -656,7 +660,7 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                             throw runtime_error("Incorrect password.");
                     }
 
-                    if (hash_algorithm == "SHA512")
+                    if (hashalgo == hash_algorithm::sha512)
                         generate_key44_sha512(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3, key3);
                     else
                         generate_key44_sha1(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3, key3);
@@ -765,12 +769,21 @@ vector<uint8_t> cfbf::decrypt44(span<uint8_t> enc_package) {
     auto ptr = ret.data();
 
     while (true) {
-        array<uint8_t, 20> h;
+        array<uint8_t, 64> h;
         AES_ctx ctx;
 
         auto seg = enc_package.subspan(0, min(SEGMENT_LENGTH, enc_package.size()));
 
-        {
+        memcpy(ptr, seg.data(), seg.size());
+
+        if (hashalgo == hash_algorithm::sha512) {
+            sha512_state ctx;
+
+            sha_init(ctx);
+            sha_process(ctx, salt.data(), (uint32_t)salt.size());
+            sha_process(ctx, &segment_no, sizeof(segment_no));
+            sha_done(ctx, h.data());
+        } else {
             SHA1_CTX ctx;
 
             ctx.update(salt);
@@ -779,10 +792,13 @@ vector<uint8_t> cfbf::decrypt44(span<uint8_t> enc_package) {
             ctx.finalize(h);
         }
 
-        AES128_init_ctx_iv(&ctx, key.data(), h.data());
-
-        memcpy(ptr, seg.data(), seg.size());
-        AES128_CBC_decrypt_buffer(&ctx, ptr, seg.size());
+        if (key_size == 32) {
+            AES256_init_ctx_iv(&ctx, key.data(), h.data());
+            AES256_CBC_decrypt_buffer(&ctx, ptr, seg.size());
+        } else {
+            AES128_init_ctx_iv(&ctx, key.data(), h.data());
+            AES128_CBC_decrypt_buffer(&ctx, ptr, seg.size());
+        }
 
         if (enc_package.size() == seg.size())
             break;

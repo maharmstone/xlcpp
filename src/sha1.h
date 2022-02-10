@@ -25,7 +25,7 @@ struct SHA1_CTX {
     }
 
     void update(std::span<const uint8_t> data);
-    void finalize(std::array<uint8_t, 20>& digest);
+    void finalize(std::span<uint8_t> digest);
 
     uint32_t state[5];
     uint32_t count[2];

@@ -43,6 +43,11 @@ public:
     std::string name;
 };
 
+enum class hash_algorithm {
+    sha1,
+    sha512
+};
+
 class cfbf {
 public:
     cfbf(std::span<const uint8_t> s);
@@ -68,4 +73,5 @@ private:
     unsigned int key_size;
     std::array<uint8_t, 16> salt;
     bool agile_enc = false;
+    enum hash_algorithm hashalgo;
 };

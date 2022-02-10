@@ -228,7 +228,7 @@ void SHA1_CTX::update(std::span<const uint8_t> data) {
 
 /* Add padding and return the message digest. */
 
-void SHA1_CTX::finalize(array<uint8_t, 20>& digest) {
+void SHA1_CTX::finalize(span<uint8_t> digest) {
     unsigned i;
     unsigned char finalcount[8];
     unsigned char c;
