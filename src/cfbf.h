@@ -64,7 +64,8 @@ private:
     std::vector<uint8_t> decrypt44(std::span<uint8_t> enc_package);
 
     std::unique_ptr<mmap> m;
-    std::array<uint8_t, 16> key;
+    std::array<uint8_t, 32> key;
+    unsigned int key_size;
     std::array<uint8_t, 16> salt;
     bool agile_enc = false;
 };
