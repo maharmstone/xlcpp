@@ -4,6 +4,35 @@
 
 using namespace std;
 
+struct xl_record {
+    uint16_t type; // FIXME - enum class
+    uint16_t length;
+};
+
+static void dump_workbook(span<const uint8_t> wb) {
+    while (wb.size() >= sizeof(xl_record)) {
+        auto r = *(xl_record*)wb.data();
+
+        fmt::print("type = {:x}, length = {:x}", r.type, r.length);
+
+        wb = wb.subspan(sizeof(xl_record));
+
+        if (r.length == 0) {
+            fmt::print("\n");
+            continue;
+        }
+
+        fmt::print(", ");
+
+        for (unsigned int i = 0; i < r.length; i++) {
+            fmt::print("{:02x} ", wb[i]);
+        }
+        fmt::print("\n");
+
+        wb = wb.subspan(r.length);
+    }
+}
+
 static void cfbf_test(const filesystem::path& fn) {
 #ifdef _WIN32
     unique_handle hup{CreateFileW((LPCWSTR)fn.u16string().c_str(), FILE_READ_DATA | DELETE, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
@@ -22,7 +51,7 @@ static void cfbf_test(const filesystem::path& fn) {
     auto mem = m.map();
 
     cfbf c(mem);
-    string enc_info, enc_package;
+    string enc_info, enc_package, workbook;
 
     for (unsigned int num = 0; const auto& e : c.entries) {
 //         fmt::print("{}\n", e.name);
@@ -72,6 +101,20 @@ static void cfbf_test(const filesystem::path& fn) {
 
                 off += size;
             }
+        } else if (e.name == "/Workbook") {
+            workbook.resize(e.get_size());
+
+            uint64_t off = 0;
+            auto buf = span((std::byte*)workbook.data(), workbook.size());
+
+            while (true) {
+                auto size = e.read(buf, off);
+
+                if (size == 0)
+                    break;
+
+                off += size;
+            }
         }
 
         ofstream f("file" + to_string(num));
@@ -93,6 +136,11 @@ static void cfbf_test(const filesystem::path& fn) {
         num++;
     }
 
+    if (!workbook.empty()) {
+        dump_workbook(span((uint8_t*)workbook.data(), workbook.size()));
+        return;
+    }
+
     if (enc_info.empty())
         throw runtime_error("EncryptionInfo not found.");
 
@@ -100,6 +148,7 @@ static void cfbf_test(const filesystem::path& fn) {
     c.decrypt(span((uint8_t*)enc_package.data(), enc_package.size()));
 }
 
+#if 0
 static void test_sha1() {
     auto hash = sha1(span<uint8_t>());
 
@@ -126,7 +175,6 @@ static void test_sha1() {
     fmt::print("\n");
 }
 
-#if 0
 static void test_key() {
     const u16string_view password = u"Password1234_";
     array<uint8_t, 16> salt{0xe8, 0x82, 0x66, 0x49, 0x0c, 0x5b, 0xd1, 0xee, 0xbd, 0x2b, 0x43, 0x94, 0xe3, 0xf8, 0x30, 0xef};
@@ -141,13 +189,12 @@ static void test_key() {
 #endif
 
 int main(int argc, char* argv[]) {
-    test_sha1();
-
     if (argc < 2) {
         fmt::print(stderr, "No filename given.\n");
         return 1;
     }
 
+//     test_sha1();
 //     test_key();
 
     try {
