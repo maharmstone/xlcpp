@@ -344,11 +344,11 @@ void cfbf::check_password(u16string_view password, span<const uint8_t> salt,
     if (encrypted_verifier_hash.size() != verifier_hash.size())
         throw formatted_error("encrypted_verifier_hash.size() was {}, expected {}", encrypted_verifier_hash.size(), verifier_hash.size());
 
-    AES_init_ctx(&ctx, key.data());
+    AES128_init_ctx(&ctx, key.data());
 
     memcpy(verifier.data(), encrypted_verifier.data(), encrypted_verifier.size());
 
-    AES_ECB_decrypt(&ctx, verifier.data());
+    AES128_ECB_decrypt(&ctx, verifier.data());
 
 #if 0
     fmt::print("verifier = ");
@@ -360,8 +360,8 @@ void cfbf::check_password(u16string_view password, span<const uint8_t> salt,
 
     memcpy(verifier_hash.data(), encrypted_verifier_hash.data(), encrypted_verifier_hash.size());
 
-    AES_ECB_decrypt(&ctx, verifier_hash.data());
-    AES_ECB_decrypt(&ctx, verifier_hash.data() + 16);
+    AES128_ECB_decrypt(&ctx, verifier_hash.data());
+    AES128_ECB_decrypt(&ctx, verifier_hash.data() + 16);
 
 #if 0
     fmt::print("verifier hash = ");
@@ -575,19 +575,19 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     if (salt_value.size() < sizeof(iv))
                         memset(&iv[salt_value.size()], 0, sizeof(iv) - salt_value.size());
 
-                    AES_init_ctx_iv(&ctx, key1.data(), iv.data());
+                    AES128_init_ctx_iv(&ctx, key1.data(), iv.data());
 
                     memcpy(verifier.data(), encrypted_verifier_hash_input.data(), encrypted_verifier_hash_input.size());
 
-                    AES_CBC_decrypt_buffer(&ctx, verifier.data(), verifier.size());
+                    AES128_CBC_decrypt_buffer(&ctx, verifier.data(), verifier.size());
 
                     memcpy(verifier_hash.data(), encrypted_verifier_hash_value.data(), encrypted_verifier_hash_value.size());
 
                     auto key2 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block2);
 
-                    AES_init_ctx_iv(&ctx, key2.data(), iv.data());
+                    AES128_init_ctx_iv(&ctx, key2.data(), iv.data());
 
-                    AES_CBC_decrypt_buffer(&ctx, verifier_hash.data(), verifier_hash.size());
+                    AES128_CBC_decrypt_buffer(&ctx, verifier_hash.data(), verifier_hash.size());
 
                     auto hash = sha1(verifier);
 
@@ -596,9 +596,9 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
 
                     auto key3 = generate_key44(password, span((uint8_t*)salt_value.data(), salt_value.size()), spin_count, block3);
 
-                    AES_init_ctx_iv(&ctx, key3.data(), iv.data());
+                    AES128_init_ctx_iv(&ctx, key3.data(), iv.data());
 
-                    AES_CBC_decrypt_buffer(&ctx, (uint8_t*)encrypted_key_value.data(), encrypted_key_value.size());
+                    AES128_CBC_decrypt_buffer(&ctx, (uint8_t*)encrypted_key_value.data(), encrypted_key_value.size());
 
                     memcpy(key.data(), encrypted_key_value.data(), key.size());
 
@@ -709,10 +709,10 @@ vector<uint8_t> cfbf::decrypt44(span<uint8_t> enc_package) {
             ctx.finalize(h);
         }
 
-        AES_init_ctx_iv(&ctx, key.data(), h.data());
+        AES128_init_ctx_iv(&ctx, key.data(), h.data());
 
         memcpy(ptr, seg.data(), seg.size());
-        AES_CBC_decrypt_buffer(&ctx, ptr, seg.size());
+        AES128_CBC_decrypt_buffer(&ctx, ptr, seg.size());
 
         if (enc_package.size() == seg.size())
             break;
@@ -742,10 +742,10 @@ vector<uint8_t> cfbf::decrypt(span<uint8_t> enc_package) {
     AES_ctx ctx;
     auto buf = enc_package;
 
-    AES_init_ctx(&ctx, key.data());
+    AES128_init_ctx(&ctx, key.data());
 
     while (!buf.empty()) {
-        AES_ECB_decrypt(&ctx, buf.data());
+        AES128_ECB_decrypt(&ctx, buf.data());
 
         buf = buf.subspan(16);
     }
