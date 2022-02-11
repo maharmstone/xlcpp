@@ -127,9 +127,10 @@ cfbf_entry::cfbf_entry(cfbf& file, const dirent& de, string_view name) : file(fi
 
 uint32_t cfbf::next_sector(uint32_t sector) const {
     auto& ssh = *(structured_storage_header*)s.data();
-    auto fat = (uint32_t*)(s.data() + ((ssh.sect_dif[0] + 1) << ssh.sector_shift));
+    auto sectors_per_dif = (1 << ssh.sector_shift) / sizeof(uint32_t);
+    auto fat = (uint32_t*)(s.data() + ((ssh.sect_dif[sector / sectors_per_dif] + 1) << ssh.sector_shift));
 
-    return fat[sector];
+    return fat[sector % sectors_per_dif];
 }
 
 uint32_t cfbf::next_mini_sector(uint32_t sector) const {
