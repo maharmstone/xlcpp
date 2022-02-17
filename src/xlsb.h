@@ -2557,3 +2557,31 @@ struct fmt::formatter<enum xlsb_type> {
         }
     }
 };
+
+struct brt_bundle_sh {
+    uint32_t hsState;
+    uint32_t iTabID;
+};
+
+#pragma pack(push,1)
+
+struct brt_row_hdr {
+    uint32_t rw;
+    uint32_t ixfe;
+    uint16_t miyRw;
+    // FIXME - make sure bitfields are in correct order
+    uint16_t fExtraAsc : 1;
+    uint16_t fExtraDsc : 1;
+    uint16_t reserved1 : 6;
+    uint16_t iOutLevel : 3;
+    uint16_t fCollapsed : 1;
+    uint16_t fDyZero : 1;
+    uint16_t fUnsynced : 1;
+    uint16_t fGhostDirty : 1;
+    uint16_t fReserved : 1;
+    uint8_t fPhShow : 1;
+    uint8_t reserved2 : 7;
+    uint32_t ccolspan;
+};
+
+#pragma pack(pop)

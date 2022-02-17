@@ -1662,8 +1662,39 @@ static void xlsb_walk(span<const uint8_t> data, const function<void(enum xlsb_ty
 }
 
 void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> data, bool visible) {
+    auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
+    unsigned int last_index = 0, last_col = 0;
+    row* row = nullptr;
+
     xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        fmt::print("{}, {}\n", (enum xlsb_type)type, d.size());
+        fmt::print("{}, {}:", (enum xlsb_type)type, d.size());
+
+        for (auto c : d) {
+            fmt::print(" {:02x}", c);
+        }
+        fmt::print("\n");
+
+        if (type == xlsb_type::BrtRowHdr) {
+            if (d.size() < sizeof(brt_row_hdr))
+                throw runtime_error("Malformed BrtRowHdr record.");
+
+            const auto& h = *(brt_row_hdr*)d.data();
+
+            if (h.rw < last_index)
+                throw formatted_error("Rows out of order.");
+
+            while (last_index < h.rw) {
+                s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+                last_index++;
+            }
+
+            s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+
+            row = &s.impl->rows.back();
+
+            last_index = h.rw + 1;
+            last_col = 0;
+        }
     });
 
     // FIXME
@@ -1677,11 +1708,6 @@ void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> d
         string rid;
         string name;
         bool visible;
-    };
-
-    struct brt_bundle_sh {
-        uint32_t hsState;
-        uint32_t iTabID;
     };
 
     vector<sheet_info> sheets_rels;
