@@ -1979,11 +1979,31 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
     }
 }
 
+void workbook_pimpl::load_shared_strings_binary(span<const uint8_t> data) {
+    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
+        if (type == xlsb_type::BrtSSTItem) {
+            if (d.size() < offsetof(brt_sst_item, richStr.str))
+                throw runtime_error("Malformed BrtSSTItem record.");
+
+            const auto& h = *(brt_sst_item*)d.data();
+
+            if (d.size() < offsetof(brt_sst_item, richStr.str) + (sizeof(char16_t) * h.richStr.len))
+                throw runtime_error("Malformed BrtSSTItem record.");
+
+            auto u16sv = u16string_view(h.richStr.str, h.richStr.len);
+
+            shared_strings2.emplace_back(utf16_to_utf8(u16sv));
+        }
+    });
+}
+
 void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& files) {
     for (const auto& f : files) {
         if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml") {
             load_shared_strings2(f.second.data);
             return;
+        } else if (f.second.content_type == "application/vnd.ms-excel.sharedStrings") {
+            load_shared_strings_binary(span((uint8_t*)f.second.data.data(), f.second.data.size()));
         }
     }
 }

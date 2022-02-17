@@ -2619,3 +2619,19 @@ struct brt_cell_st {
     uint32_t len;
     char16_t str[0];
 };
+
+#pragma pack(push,1)
+
+struct rich_str {
+    uint8_t fRichStr : 1;
+    uint8_t fExtStr : 1;
+    uint8_t unused1 : 6;
+    uint32_t len;
+    char16_t str[0];
+};
+
+#pragma pack(pop)
+
+struct brt_sst_item {
+    rich_str richStr;
+};
