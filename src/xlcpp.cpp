@@ -1840,14 +1840,40 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             }
 
             // FIXME - BrtCellIsst
-            // FIXME - BrtCellRString
+
+            case xlsb_type::BrtCellRString: {
+                if (d.size() < offsetof(brt_cell_rstring, value.str))
+                    throw runtime_error("Malformed BrtCellRString record.");
+
+                const auto& c = *(brt_cell_rstring*)d.data();
+
+                if (d.size() < offsetof(brt_cell_rstring, value.str) + (c.value.len * sizeof(char16_t)))
+                    throw runtime_error("Malformed BrtCellRString record.");
+
+                if (c.cell.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.cell.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.cell.column + 1;
+
+                auto u16sv = u16string_view(c.value.str, c.value.len);
+
+                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+
+                // so we don't have to expose shared_string publicly
+                cell->impl->val = utf16_to_utf8(u16sv);
+
+                break;
+            }
 
             default:
                 break;
         }
     });
-
-    // FIXME
 }
 
 void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {

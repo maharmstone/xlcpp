@@ -2635,3 +2635,8 @@ struct rich_str {
 struct brt_sst_item {
     rich_str richStr;
 };
+
+struct brt_cell_rstring {
+    xlsb_cell cell;
+    rich_str value;
+};
