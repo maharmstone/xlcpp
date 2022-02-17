@@ -1661,24 +1661,39 @@ static void xlsb_walk(span<const uint8_t> data, const function<void(enum xlsb_ty
     }
 }
 
-void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {
-    xlsb_walk(data, [](enum xlsb_type type, span<const uint8_t> d) {
+void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> data, bool visible) {
+    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
         fmt::print("{}, {}\n", (enum xlsb_type)type, d.size());
+    });
 
+    // FIXME
+}
+
+void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {
+    struct sheet_info {
+        sheet_info(string_view rid, string_view name, bool visible) :
+            rid(rid), name(name), visible(visible) { }
+
+        string rid;
+        string name;
+        bool visible;
+    };
+
+    struct brt_bundle_sh {
+        uint32_t hsState;
+        uint32_t iTabID;
+    };
+
+    vector<sheet_info> sheets_rels;
+
+    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
         if (type == xlsb_type::BrtBundleSh) {
-            if (d.size() < sizeof(uint32_t))
+            if (d.size() < sizeof(brt_bundle_sh))
                 throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto hsState = *(uint32_t*)d.data();
+            auto& h = *(brt_bundle_sh*)d.data();
 
-            d = d.subspan(sizeof(uint32_t));
-
-            if (d.size() < sizeof(uint32_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto iTabID = *(uint32_t*)d.data();
-
-            d = d.subspan(sizeof(uint32_t));
+            d = d.subspan(sizeof(brt_bundle_sh));
 
             if (d.size() < sizeof(uint32_t))
                 throw runtime_error("Malformed BrtBundleSh entry.");
@@ -1709,13 +1724,41 @@ void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> d
 
             auto strName = u16string_view((char16_t*)d.data(), name_size);
 
-            fmt::print("hsState = {}, iTabID = {}, strRelID = {}, strName = {}\n", hsState, iTabID, utf16_to_utf8(strRelID), utf16_to_utf8(strName));
+            sheets_rels.emplace_back(utf16_to_utf8(strRelID), utf16_to_utf8(strName), h.hsState == 0);
         }
     });
 
-    // FIXME
+    // FIXME - preserve sheet order
 
-    throw runtime_error("FIXME - parse_workbook_binary");
+    auto rels = read_relationships(fn, files);
+
+    for (const auto& sr : sheets_rels) {
+        for (const auto& r : rels) {
+            if (r.first == sr.rid) {
+                auto name = filesystem::path(fn);
+
+                // FIXME - can we resolve relative paths properly?
+
+                name.remove_filename();
+                name /= r.second;
+
+                auto ns = name.string();
+
+                for (auto& c : ns) {
+                    if (c == '\\')
+                        c = '/';
+                }
+
+                if (files.count(ns) == 0)
+                    throw formatted_error("File {} not found.", ns);
+
+                auto& d = files.at(ns).data;
+
+                load_sheet_binary(sr.name, span((uint8_t*)d.data(), d.size()), sr.visible);
+                break;
+            }
+        }
+    }
 }
 
 void workbook_pimpl::load_shared_strings2(const string_view& sv) {

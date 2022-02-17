@@ -94,6 +94,7 @@ public:
     void parse_workbook_binary(std::string_view fn, std::span<const uint8_t> data,
                                const std::unordered_map<std::string, file>& files);
     void load_sheet(const std::string_view& name, const std::string_view& data, bool visible);
+    void load_sheet_binary(std::string_view name, std::span<const uint8_t> data, bool visible);
     void load_shared_strings2(const std::string_view& sv);
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
     void load_styles(const std::unordered_map<std::string, file>& files);
