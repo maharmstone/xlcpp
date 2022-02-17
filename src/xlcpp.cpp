@@ -1699,9 +1699,11 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            case xlsb_type::BrtCellBlank: {
+            case xlsb_type::BrtCellBlank:
+            case xlsb_type::BrtCellError:
+            case xlsb_type::BrtFmlaError: {
                 if (d.size() < sizeof(xlsb_cell))
-                    throw runtime_error("Malformed BrtCellBank record.");
+                    throw runtime_error("Malformed cell record.");
 
                 const auto& c = *(xlsb_cell*)d.data();
 
@@ -1763,7 +1765,6 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            // FIXME - BrtCellError
             // FIXME - BrtCellBool
             // FIXME - BrtCellReal
             // FIXME - BrtCellSt
@@ -1771,7 +1772,6 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             // FIXME - BrtFmlaString
             // FIXME - BrtFmlaNum
             // FIXME - BrtFmlaBool
-            // FIXME - BrtFmlaError
             // FIXME - BrtCellRString
 
             default:
