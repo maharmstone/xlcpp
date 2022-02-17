@@ -1664,6 +1664,53 @@ static void xlsb_walk(span<const uint8_t> data, const function<void(enum xlsb_ty
 void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {
     xlsb_walk(data, [](enum xlsb_type type, span<const uint8_t> d) {
         fmt::print("{}, {}\n", (enum xlsb_type)type, d.size());
+
+        if (type == xlsb_type::BrtBundleSh) {
+            if (d.size() < sizeof(uint32_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto hsState = *(uint32_t*)d.data();
+
+            d = d.subspan(sizeof(uint32_t));
+
+            if (d.size() < sizeof(uint32_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto iTabID = *(uint32_t*)d.data();
+
+            d = d.subspan(sizeof(uint32_t));
+
+            if (d.size() < sizeof(uint32_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto relid_size = *(uint32_t*)d.data();
+
+            d = d.subspan(sizeof(uint32_t));
+
+            if (relid_size == 0xffffffff)
+                relid_size = 0;
+
+            if (d.size() < relid_size * sizeof(char16_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto strRelID = u16string_view((char16_t*)d.data(), relid_size);
+
+            d = d.subspan(relid_size * sizeof(char16_t));
+
+            if (d.size() < sizeof(uint32_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto name_size = *(uint32_t*)d.data();
+
+            d = d.subspan(sizeof(uint32_t));
+
+            if (d.size() < name_size * sizeof(char16_t))
+                throw runtime_error("Malformed BrtBundleSh entry.");
+
+            auto strName = u16string_view((char16_t*)d.data(), name_size);
+
+            fmt::print("hsState = {}, iTabID = {}, strRelID = {}, strName = {}\n", hsState, iTabID, utf16_to_utf8(strRelID), utf16_to_utf8(strName));
+        }
     });
 
     // FIXME
