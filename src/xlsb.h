@@ -2607,4 +2607,9 @@ struct brt_cell_bool {
     uint8_t fBool;
 };
 
+struct brt_cell_real {
+    xlsb_cell cell;
+    double xnum;
+};
+
 #pragma pack(pop)
