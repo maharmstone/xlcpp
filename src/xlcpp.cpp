@@ -1674,26 +1674,90 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
         }
         fmt::print("\n");
 
-        if (type == xlsb_type::BrtRowHdr) {
-            if (d.size() < sizeof(brt_row_hdr))
-                throw runtime_error("Malformed BrtRowHdr record.");
+        switch (type) {
+            case xlsb_type::BrtRowHdr: {
+                if (d.size() < sizeof(brt_row_hdr))
+                    throw runtime_error("Malformed BrtRowHdr record.");
 
-            const auto& h = *(brt_row_hdr*)d.data();
+                const auto& h = *(brt_row_hdr*)d.data();
 
-            if (h.rw < last_index)
-                throw formatted_error("Rows out of order.");
+                if (h.rw < last_index)
+                    throw formatted_error("Rows out of order.");
 
-            while (last_index < h.rw) {
+                while (last_index < h.rw) {
+                    s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+                    last_index++;
+                }
+
                 s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
-                last_index++;
+
+                row = &s.impl->rows.back();
+
+                last_index = h.rw + 1;
+                last_col = 0;
+
+                break;
             }
 
-            s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
+            // FIXME - BrtCellBlank
 
-            row = &s.impl->rows.back();
+            case xlsb_type::BrtCellRk: {
+                if (d.size() < sizeof(brt_cell_rk))
+                    throw runtime_error("Malformed BrtCellRk record.");
 
-            last_index = h.rw + 1;
-            last_col = 0;
+                const auto& c = *(brt_cell_rk*)d.data();
+
+                // FIXME - styles
+                // FIXME - dates, times, datetimes
+
+                if (c.cell.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.cell.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.cell.column + 1;
+
+                if (c.value.fInt) {
+                    auto num = c.value.num;
+                    auto val = *reinterpret_cast<int32_t*>(&num);
+
+                    if (!c.value.fx100)
+                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)val);
+                    else {
+                        if (val % 100)
+                            row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (double)val / 100.0);
+                        else
+                            row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)(val / 100));
+                    }
+                } else {
+                    auto num = ((uint64_t)c.value.num) << 34;
+                    auto d = *reinterpret_cast<double*>(&num);
+
+                    if (c.value.fx100)
+                        d /= 100.0;
+
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                }
+
+                break;
+            }
+
+            // FIXME - BrtCellError
+            // FIXME - BrtCellBool
+            // FIXME - BrtCellReal
+            // FIXME - BrtCellSt
+            // FIXME - BrtCellIsst
+            // FIXME - BrtFmlaString
+            // FIXME - BrtFmlaNum
+            // FIXME - BrtFmlaBool
+            // FIXME - BrtFmlaError
+            // FIXME - BrtCellRString
+
+            default:
+                break;
         }
     });
 

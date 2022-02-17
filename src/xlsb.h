@@ -2584,4 +2584,22 @@ struct brt_row_hdr {
     uint32_t ccolspan;
 };
 
+struct xlsb_cell {
+    uint32_t column;
+    uint32_t iStyleRef : 24;
+    uint32_t fPhShow : 1;
+    uint32_t reserved : 7;
+};
+
+struct rk_number {
+    uint32_t fx100 : 1;
+    uint32_t fInt : 1;
+    uint32_t num : 30;
+};
+
+struct brt_cell_rk {
+    xlsb_cell cell;
+    rk_number value;
+};
+
 #pragma pack(pop)
