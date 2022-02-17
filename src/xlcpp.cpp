@@ -1667,13 +1667,6 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
     row* row = nullptr;
 
     xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        fmt::print("{}, {}:", (enum xlsb_type)type, d.size());
-
-        for (auto c : d) {
-            fmt::print(" {:02x}", c);
-        }
-        fmt::print("\n");
-
         switch (type) {
             case xlsb_type::BrtRowHdr: {
                 if (d.size() < sizeof(brt_row_hdr))
