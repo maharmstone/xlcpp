@@ -2640,3 +2640,8 @@ struct brt_cell_rstring {
     xlsb_cell cell;
     rich_str value;
 };
+
+struct brt_cell_isst {
+    xlsb_cell cell;
+    uint32_t isst;
+};

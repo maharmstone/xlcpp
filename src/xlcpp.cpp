@@ -1839,7 +1839,33 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            // FIXME - BrtCellIsst
+            case xlsb_type::BrtCellIsst: {
+                if (d.size() < sizeof(brt_cell_isst))
+                    throw runtime_error("Malformed BrtCellIsst record.");
+
+                const auto& c = *(brt_cell_isst*)d.data();
+
+                if (c.cell.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.cell.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.cell.column + 1;
+
+                shared_string ss;
+                ss.num = c.isst;
+
+                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+
+                // so we don't have to expose shared_string publicly
+                delete cell->impl;
+                cell->impl = new cell_pimpl(*row->impl, (unsigned int)row->impl->cells.size(), ss);
+
+                break;
+            }
 
             case xlsb_type::BrtCellRString: {
                 if (d.size() < offsetof(brt_cell_rstring, value.str))
