@@ -2602,4 +2602,9 @@ struct brt_cell_rk {
     rk_number value;
 };
 
+struct brt_cell_bool {
+    xlsb_cell cell;
+    uint8_t fBool;
+};
+
 #pragma pack(pop)

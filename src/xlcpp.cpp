@@ -1765,13 +1765,33 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            // FIXME - BrtCellBool
+            case xlsb_type::BrtCellBool:
+            case xlsb_type::BrtFmlaBool: {
+                if (d.size() < sizeof(brt_cell_bool))
+                    throw runtime_error("Malformed BrtCellBool record.");
+
+                const auto& c = *(brt_cell_bool*)d.data();
+
+                if (c.cell.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.cell.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.cell.column + 1;
+
+                row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, c.fBool != 0);
+
+                break;
+            }
+
             // FIXME - BrtCellReal
             // FIXME - BrtCellSt
             // FIXME - BrtCellIsst
             // FIXME - BrtFmlaString
             // FIXME - BrtFmlaNum
-            // FIXME - BrtFmlaBool
             // FIXME - BrtCellRString
 
             default:
