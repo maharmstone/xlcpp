@@ -1787,7 +1787,8 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            case xlsb_type::BrtCellReal: {
+            case xlsb_type::BrtCellReal:
+            case xlsb_type::BrtFmlaNum: {
                 if (d.size() < sizeof(brt_cell_real))
                     throw runtime_error("Malformed BrtCellReal record.");
 
@@ -1808,10 +1809,37 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            // FIXME - BrtCellSt
+            case xlsb_type::BrtCellSt:
+            case xlsb_type::BrtFmlaString: {
+                if (d.size() < offsetof(brt_cell_st, str))
+                    throw runtime_error("Malformed BrtCellSt record.");
+
+                const auto& c = *(brt_cell_st*)d.data();
+
+                if (d.size() < offsetof(brt_cell_st, str) + (c.len * sizeof(char16_t)))
+                    throw runtime_error("Malformed BrtCellSt record.");
+
+                if (c.cell.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.cell.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.cell.column + 1;
+
+                auto u16sv = u16string_view(c.str, c.len);
+
+                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+
+                // so we don't have to expose shared_string publicly
+                cell->impl->val = utf16_to_utf8(u16sv);
+
+                break;
+            }
+
             // FIXME - BrtCellIsst
-            // FIXME - BrtFmlaString
-            // FIXME - BrtFmlaNum
             // FIXME - BrtCellRString
 
             default:

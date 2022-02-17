@@ -2597,6 +2597,8 @@ struct rk_number {
     uint32_t num : 30;
 };
 
+#pragma pack(pop)
+
 struct brt_cell_rk {
     xlsb_cell cell;
     rk_number value;
@@ -2612,4 +2614,8 @@ struct brt_cell_real {
     double xnum;
 };
 
-#pragma pack(pop)
+struct brt_cell_st {
+    xlsb_cell cell;
+    uint32_t len;
+    char16_t str[0];
+};
