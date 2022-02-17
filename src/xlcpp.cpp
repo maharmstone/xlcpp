@@ -993,7 +993,7 @@ static void parse_content_types(const string_view& ct, unordered_map<string, fil
                                           r.namespace_uri_raw().decode(), r.local_name(), NS_CONTENT_TYPES);
                 }
             } else if (depth == 1) {
-                if (r.local_name() == "Default" && !r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
+                if (r.local_name() == "Default" && r.namespace_uri_raw().cmp(NS_CONTENT_TYPES)) {
                     auto ext = try_decode(r.get_attribute("Extension"));
                     auto ct = try_decode(r.get_attribute("ContentType"));
 
