@@ -3,6 +3,7 @@
 #include "mmap.h"
 #include "cfbf.h"
 #include "utf16.h"
+#include "xlsb.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <vector>
@@ -1036,12 +1037,13 @@ static void parse_content_types(const string_view& ct, unordered_map<string, fil
 static const pair<const string, file>& find_workbook(const unordered_map<string, file>& files) {
     for (const auto& f : files) {
         if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" ||
-            f.second.content_type == "application/vnd.ms-excel.sheet.macroEnabled.main+xml") {
+            f.second.content_type == "application/vnd.ms-excel.sheet.macroEnabled.main+xml" ||
+            f.second.content_type == "application/vnd.ms-excel.sheet.binary.macroEnabled.main") {
             return f;
         }
     }
 
-    throw formatted_error("Could not find workbook XML file.");
+    throw formatted_error("Could not find workbook file.");
 }
 
 static unordered_map<string, string> read_relationships(const string_view& fn, const unordered_map<string, file>& files) {
@@ -1622,6 +1624,53 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
     }
 }
 
+static void xlsb_walk(span<const uint8_t> data, const function<void(enum xlsb_type, span<const uint8_t>)>& func) {
+    while (!data.empty()) {
+        uint16_t type;
+        uint32_t length;
+
+        type = data[0];
+        data = data.subspan(1);
+
+        if (type & 0x80) {
+            type = (uint16_t)((type & 0x7f) | ((uint16_t)data[0] << 7));
+            data = data.subspan(1);
+        }
+
+        length = data[0];
+        data = data.subspan(1);
+
+        if (length & 0x80) {
+            length = (length & 0x7f) | ((uint32_t)data[0] << 7);
+            data = data.subspan(1);
+        }
+
+        if (length & 0x4000) {
+            length = (length & 0x3fff) | ((uint32_t)data[0] << 14);
+            data = data.subspan(1);
+        }
+
+        if (length & 0x200000) {
+            length = (length & 0x1fffff) | ((uint32_t)(data[0] & 0x7f) << 21);
+            data = data.subspan(1);
+        }
+
+        func((enum xlsb_type)type, data.subspan(0, length));
+
+        data = data.subspan(length);
+    }
+}
+
+void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {
+    xlsb_walk(data, [](enum xlsb_type type, span<const uint8_t> d) {
+        fmt::print("{}, {}\n", (enum xlsb_type)type, d.size());
+    });
+
+    // FIXME
+
+    throw runtime_error("FIXME - parse_workbook_binary");
+}
+
 void workbook_pimpl::load_shared_strings2(const string_view& sv) {
     xml_reader r(sv);
     unsigned int depth = 0;
@@ -1803,7 +1852,7 @@ void workbook_pimpl::load_archive(struct archive* a) {
                     c = c - 'A' + 'a';
             }
 
-            if (ext != ".xml" && ext != ".rels")
+            if (ext != ".xml" && ext != ".rels" && ext != ".bin")
                 continue;
 
             string buf;
@@ -1836,7 +1885,10 @@ void workbook_pimpl::load_archive(struct archive* a) {
 
     auto& wb = find_workbook(files);
 
-    parse_workbook(wb.first, wb.second.data, files);
+    if (wb.second.content_type == "application/vnd.ms-excel.sheet.binary.macroEnabled.main")
+        parse_workbook_binary(wb.first, span((uint8_t*)wb.second.data.data(), wb.second.data.size()), files);
+    else
+        parse_workbook(wb.first, wb.second.data, files);
 }
 
 workbook_pimpl::workbook_pimpl(const filesystem::path& fn, string_view password) {
