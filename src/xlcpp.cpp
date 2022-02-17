@@ -1699,7 +1699,25 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 break;
             }
 
-            // FIXME - BrtCellBlank
+            case xlsb_type::BrtCellBlank: {
+                if (d.size() < sizeof(xlsb_cell))
+                    throw runtime_error("Malformed BrtCellBank record.");
+
+                const auto& c = *(xlsb_cell*)d.data();
+
+                if (c.column < last_col)
+                    throw formatted_error("Cells out of order.");
+
+                while (last_col < c.column) {
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                    last_col++;
+                }
+
+                last_col = c.column + 1;
+
+                row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                break;
+            }
 
             case xlsb_type::BrtCellRk: {
                 if (d.size() < sizeof(brt_cell_rk))
