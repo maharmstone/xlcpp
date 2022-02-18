@@ -1723,11 +1723,6 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 // FIXME - styles
                 // FIXME - dates, times, datetimes
 
-//                 uint32_t column;
-//                 uint32_t iStyleRef : 24;
-//                 uint32_t fPhShow : 1;
-                fmt::print("column = {}, iStyleRef = {}, fPhShow = {}\n", c.cell.column, c.cell.iStyleRef, c.cell.fPhShow);
-
                 if (c.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
@@ -1738,27 +1733,55 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
                 last_col = c.cell.column + 1;
 
+                auto number_format = find_number_format(c.cell.iStyleRef);
+
+//                 uint32_t column;
+//                 uint32_t iStyleRef : 24;
+//                 uint32_t fPhShow : 1;
+                fmt::print("column = {}, iStyleRef = {}, fPhShow = {} (number_format = {})\n", c.cell.column, c.cell.iStyleRef, c.cell.fPhShow, number_format);
+
+                double d;
+
                 if (c.value.fInt) {
                     auto num = c.value.num;
                     auto val = *reinterpret_cast<int32_t*>(&num);
 
-                    if (!c.value.fx100)
-                        row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)val);
-                    else {
-                        if (val % 100)
-                            row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (double)val / 100.0);
-                        else
-                            row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, (int64_t)(val / 100));
-                    }
+                    d = val;
                 } else {
                     auto num = ((uint64_t)c.value.num) << 34;
-                    auto d = *reinterpret_cast<double*>(&num);
-
-                    if (c.value.fx100)
-                        d /= 100.0;
-
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                    d = *reinterpret_cast<double*>(&num);
                 }
+
+                if (c.value.fx100)
+                    d /= 100.0;
+
+                bool dt = is_date(number_format);
+                bool tm = is_time(number_format);
+
+                // FIXME - we can optimize is_date and is_time if one of the preset number formats
+
+                if (dt && tm) {
+                    // FIXME
+//                     auto d = stod(v_val);
+//                     auto n = (unsigned int)((d - (int)d) * 86400.0);
+//                     datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
+//
+//                     dt.d = number_to_date((int)d, date1904);
+//
+//                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
+                } else if (dt) {
+                    auto ymd = number_to_date((unsigned int)d, date1904);
+
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
+                } else if (tm) {
+                    // FIXME
+//                     auto n = (unsigned int)(stod(v_val) * 86400.0);
+//
+//                     chrono::seconds t{n % 86400};
+//
+//                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
+                } else
+                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
 
                 break;
             }
@@ -2156,6 +2179,8 @@ void workbook_pimpl::load_styles_binary(span<const uint8_t> data) {
         else if (type == xlsb_type::BrtEndCellXFs)
             in_cellxfs = false;
         else if (type == xlsb_type::BrtXF && in_cellxfs) {
+            optional<unsigned int> numfmtid;
+
             if (d.size() < sizeof(brt_xf))
                 throw runtime_error("Malformed BrtXF record.");
 
@@ -2163,7 +2188,12 @@ void workbook_pimpl::load_styles_binary(span<const uint8_t> data) {
 
             fmt::print("ixfeParent = {}, iFmt = {}, iFont = {}, iFill = {}, ixBOrder = {}, trot = {}, indent = {}, alc = {}, alcv = {}, fWrap = {}, fJustLast = {}, fShrinkToFit = {}, fMergeCell = {}, iReadingOrder = {}, fLocked = {}, fHidden = {}, fSxButton = {}, f123Prefix = {}, xfGrbitAtr = {}\n", h.ixfeParent, h.iFmt, h.iFont, h.iFill, h.ixBOrder, h.trot, h.indent, h.alc, h.alcv, h.fWrap, h.fJustLast, h.fShrinkToFit, h.fMergeCell, h.iReadingOrder, h.fLocked, h.fHidden, h.fSxButton, h.f123Prefix, h.xfGrbitAtr);
 
-            // FIXME
+            numfmtid = h.iFmt;
+
+            if (h.xfGrbitAtr & 1)
+                numfmtid = nullopt;
+
+            cell_styles.push_back(numfmtid);
         }
 
         // FIXME - numFmt
