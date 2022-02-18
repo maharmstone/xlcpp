@@ -2645,3 +2645,30 @@ struct brt_cell_isst {
     xlsb_cell cell;
     uint32_t isst;
 };
+
+#pragma pack(push,1)
+
+struct brt_xf {
+    uint16_t ixfeParent;
+    uint16_t iFmt;
+    uint16_t iFont;
+    uint16_t iFill;
+    uint16_t ixBOrder;
+    uint8_t trot;
+    uint8_t indent;
+    uint16_t f123Prefix : 1;
+    uint16_t fSxButton : 1;
+    uint16_t fHidden : 1;
+    uint16_t fLocked : 1;
+    uint16_t iReadingOrder : 2;
+    uint16_t fMergeCell : 1;
+    uint16_t fShrinkToFit : 1;
+    uint16_t fJustLast : 1;
+    uint16_t fWrap : 1;
+    uint16_t alcv : 3;
+    uint16_t alc : 3;
+    uint16_t unused : 10;
+    uint16_t xfGrbitAtr : 6;
+};
+
+#pragma pack(pop)

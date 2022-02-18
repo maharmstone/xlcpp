@@ -96,9 +96,11 @@ public:
     void load_sheet(const std::string_view& name, const std::string_view& data, bool visible);
     void load_sheet_binary(std::string_view name, std::span<const uint8_t> data, bool visible);
     void load_shared_strings2(const std::string_view& sv);
+    void load_shared_strings_binary(std::span<const uint8_t> data);
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
     void load_styles(const std::unordered_map<std::string, file>& files);
     void load_styles2(const std::string_view& sv);
+    void load_styles_binary(std::span<const uint8_t> data);
     std::string find_number_format(unsigned int num);
     void load_archive(struct archive* a);
 

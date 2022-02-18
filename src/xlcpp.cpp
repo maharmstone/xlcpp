@@ -1723,6 +1723,11 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 // FIXME - styles
                 // FIXME - dates, times, datetimes
 
+//                 uint32_t column;
+//                 uint32_t iStyleRef : 24;
+//                 uint32_t fPhShow : 1;
+                fmt::print("column = {}, iStyleRef = {}, fPhShow = {}\n", c.cell.column, c.cell.iStyleRef, c.cell.fPhShow);
+
                 if (c.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
@@ -2135,10 +2140,45 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
     }
 }
 
+void workbook_pimpl::load_styles_binary(span<const uint8_t> data) {
+    bool in_cellxfs = false;
+
+    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
+        fmt::print("{}, {}:", type, d.size());
+
+        for (auto c : d) {
+            fmt::print(" {:02x}", c);
+        }
+        fmt::print("\n");
+
+        if (type == xlsb_type::BrtBeginCellXFs)
+            in_cellxfs = true;
+        else if (type == xlsb_type::BrtEndCellXFs)
+            in_cellxfs = false;
+        else if (type == xlsb_type::BrtXF && in_cellxfs) {
+            if (d.size() < sizeof(brt_xf))
+                throw runtime_error("Malformed BrtXF record.");
+
+            const auto& h = *(brt_xf*)d.data();
+
+            fmt::print("ixfeParent = {}, iFmt = {}, iFont = {}, iFill = {}, ixBOrder = {}, trot = {}, indent = {}, alc = {}, alcv = {}, fWrap = {}, fJustLast = {}, fShrinkToFit = {}, fMergeCell = {}, iReadingOrder = {}, fLocked = {}, fHidden = {}, fSxButton = {}, f123Prefix = {}, xfGrbitAtr = {}\n", h.ixfeParent, h.iFmt, h.iFont, h.iFill, h.ixBOrder, h.trot, h.indent, h.alc, h.alcv, h.fWrap, h.fJustLast, h.fShrinkToFit, h.fMergeCell, h.iReadingOrder, h.fLocked, h.fHidden, h.fSxButton, h.f123Prefix, h.xfGrbitAtr);
+
+            // FIXME
+        }
+
+        // FIXME - numFmt
+    });
+
+    fmt::print("---\n");
+}
+
 void workbook_pimpl::load_styles(const unordered_map<string, file>& files) {
     for (const auto& f : files) {
         if (f.second.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml") {
             load_styles2(f.second.data);
+            return;
+        } else if (f.second.content_type == "application/vnd.ms-excel.styles") {
+            load_styles_binary(span((uint8_t*)f.second.data.data(), f.second.data.size()));
             return;
         }
     }
