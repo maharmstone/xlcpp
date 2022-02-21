@@ -1698,17 +1698,19 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < sizeof(xlsb_cell))
                     throw runtime_error("Malformed cell record.");
 
-                const auto& c = *(xlsb_cell*)d.data();
+                const auto& h = *(xlsb_cell*)d.data();
 
-                if (c.column < last_col)
+                if (h.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.column) {
+                while (last_col < h.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.column + 1;
+                last_col = h.column + 1;
+
+                auto number_format = find_number_format(h.iStyleRef);
 
                 row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                 break;
@@ -1718,45 +1720,38 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < sizeof(brt_cell_rk))
                     throw runtime_error("Malformed BrtCellRk record.");
 
-                const auto& c = *(brt_cell_rk*)d.data();
+                const auto& h = *(brt_cell_rk*)d.data();
 
-                // FIXME - styles
-                // FIXME - dates, times, datetimes
-
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
 
-                auto number_format = find_number_format(c.cell.iStyleRef);
-
-//                 uint32_t column;
-//                 uint32_t iStyleRef : 24;
-//                 uint32_t fPhShow : 1;
-                fmt::print("column = {}, iStyleRef = {}, fPhShow = {} (number_format = {})\n", c.cell.column, c.cell.iStyleRef, c.cell.fPhShow, number_format);
+                auto number_format = find_number_format(h.cell.iStyleRef);
 
                 double d;
 
-                if (c.value.fInt) {
-                    auto num = c.value.num;
+                if (h.value.fInt) {
+                    auto num = h.value.num;
                     auto val = *reinterpret_cast<int32_t*>(&num);
 
                     d = val;
                 } else {
-                    auto num = ((uint64_t)c.value.num) << 34;
+                    auto num = ((uint64_t)h.value.num) << 34;
                     d = *reinterpret_cast<double*>(&num);
                 }
 
-                if (c.value.fx100)
+                if (h.value.fx100)
                     d /= 100.0;
 
                 bool dt = is_date(number_format);
                 bool tm = is_time(number_format);
+                cell* c;
 
                 // FIXME - we can optimize is_date and is_time if one of the preset number formats
 
@@ -1772,7 +1767,7 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 } else if (dt) {
                     auto ymd = number_to_date((unsigned int)d, date1904);
 
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
                 } else if (tm) {
                     // FIXME
 //                     auto n = (unsigned int)(stod(v_val) * 86400.0);
@@ -1781,7 +1776,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 //
 //                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
                 } else
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
+
+                c->impl->number_format = number_format;
 
                 break;
             }
@@ -1791,19 +1788,23 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < sizeof(brt_cell_bool))
                     throw runtime_error("Malformed BrtCellBool record.");
 
-                const auto& c = *(brt_cell_bool*)d.data();
+                const auto& h = *(brt_cell_bool*)d.data();
 
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
 
-                row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, c.fBool != 0);
+                auto number_format = find_number_format(h.cell.iStyleRef);
+
+                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.fBool != 0);
+
+                c->impl->number_format = number_format;
 
                 break;
             }
@@ -1813,19 +1814,23 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < sizeof(brt_cell_real))
                     throw runtime_error("Malformed BrtCellReal record.");
 
-                const auto& c = *(brt_cell_real*)d.data();
+                const auto& h = *(brt_cell_real*)d.data();
 
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
 
-                row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, c.xnum);
+                auto number_format = find_number_format(h.cell.iStyleRef);
+
+                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
+
+                c->impl->number_format = number_format;
 
                 break;
             }
@@ -1835,27 +1840,30 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < offsetof(brt_cell_st, str))
                     throw runtime_error("Malformed BrtCellSt record.");
 
-                const auto& c = *(brt_cell_st*)d.data();
+                const auto& h = *(brt_cell_st*)d.data();
 
-                if (d.size() < offsetof(brt_cell_st, str) + (c.len * sizeof(char16_t)))
+                if (d.size() < offsetof(brt_cell_st, str) + (h.len * sizeof(char16_t)))
                     throw runtime_error("Malformed BrtCellSt record.");
 
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
 
-                auto u16sv = u16string_view(c.str, c.len);
+                auto number_format = find_number_format(h.cell.iStyleRef);
 
-                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                auto u16sv = u16string_view(h.str, h.len);
+
+                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
 
                 // so we don't have to expose shared_string publicly
-                cell->impl->val = utf16_to_utf8(u16sv);
+                c->impl->val = utf16_to_utf8(u16sv);
+                c->impl->number_format = number_format;
 
                 break;
             }
@@ -1864,26 +1872,30 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < sizeof(brt_cell_isst))
                     throw runtime_error("Malformed BrtCellIsst record.");
 
-                const auto& c = *(brt_cell_isst*)d.data();
+                const auto& h = *(brt_cell_isst*)d.data();
 
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
+
+                auto number_format = find_number_format(h.cell.iStyleRef);
 
                 shared_string ss;
-                ss.num = c.isst;
+                ss.num = h.isst;
 
-                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
 
                 // so we don't have to expose shared_string publicly
-                delete cell->impl;
-                cell->impl = new cell_pimpl(*row->impl, (unsigned int)row->impl->cells.size(), ss);
+                delete c->impl;
+                c->impl = new cell_pimpl(*row->impl, (unsigned int)row->impl->cells.size(), ss);
+
+                c->impl->number_format = number_format;
 
                 break;
             }
@@ -1892,27 +1904,31 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 if (d.size() < offsetof(brt_cell_rstring, value.str))
                     throw runtime_error("Malformed BrtCellRString record.");
 
-                const auto& c = *(brt_cell_rstring*)d.data();
+                const auto& h = *(brt_cell_rstring*)d.data();
 
-                if (d.size() < offsetof(brt_cell_rstring, value.str) + (c.value.len * sizeof(char16_t)))
+                if (d.size() < offsetof(brt_cell_rstring, value.str) + (h.value.len * sizeof(char16_t)))
                     throw runtime_error("Malformed BrtCellRString record.");
 
-                if (c.cell.column < last_col)
+                if (h.cell.column < last_col)
                     throw formatted_error("Cells out of order.");
 
-                while (last_col < c.cell.column) {
+                while (last_col < h.cell.column) {
                     row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
                     last_col++;
                 }
 
-                last_col = c.cell.column + 1;
+                last_col = h.cell.column + 1;
 
-                auto u16sv = u16string_view(c.value.str, c.value.len);
+                auto number_format = find_number_format(h.cell.iStyleRef);
 
-                auto cell = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
+                auto u16sv = u16string_view(h.value.str, h.value.len);
+
+                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
 
                 // so we don't have to expose shared_string publicly
-                cell->impl->val = utf16_to_utf8(u16sv);
+                c->impl->val = utf16_to_utf8(u16sv);
+
+                c->impl->number_format = number_format;
 
                 break;
             }
