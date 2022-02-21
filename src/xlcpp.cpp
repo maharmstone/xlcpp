@@ -1665,10 +1665,22 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
     unsigned int last_index = 0, last_col = 0;
     row* row = nullptr;
+    bool in_sheet_data = false;
 
     xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
         switch (type) {
+            case xlsb_type::BrtBeginSheetData:
+                in_sheet_data = true;
+                break;
+
+            case xlsb_type::BrtEndSheetData:
+                in_sheet_data = false;
+                break;
+
             case xlsb_type::BrtRowHdr: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(brt_row_hdr))
                     throw runtime_error("Malformed BrtRowHdr record.");
 
@@ -1695,6 +1707,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             case xlsb_type::BrtCellBlank:
             case xlsb_type::BrtCellError:
             case xlsb_type::BrtFmlaError: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(xlsb_cell))
                     throw runtime_error("Malformed cell record.");
 
@@ -1717,6 +1732,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             }
 
             case xlsb_type::BrtCellRk: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(brt_cell_rk))
                     throw runtime_error("Malformed BrtCellRk record.");
 
@@ -1773,6 +1791,7 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 //                     chrono::seconds t{n % 86400};
 //
 //                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr); // FIXME
                 } else
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
 
@@ -1783,6 +1802,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
             case xlsb_type::BrtCellBool:
             case xlsb_type::BrtFmlaBool: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(brt_cell_bool))
                     throw runtime_error("Malformed BrtCellBool record.");
 
@@ -1809,6 +1831,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
             case xlsb_type::BrtCellReal:
             case xlsb_type::BrtFmlaNum: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(brt_cell_real))
                     throw runtime_error("Malformed BrtCellReal record.");
 
@@ -1842,7 +1867,7 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
                 } else if (tm) {
-                    // FIXME
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr); // FIXME
                 } else
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
 
@@ -1853,6 +1878,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
             case xlsb_type::BrtCellSt:
             case xlsb_type::BrtFmlaString: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < offsetof(brt_cell_st, str))
                     throw runtime_error("Malformed BrtCellSt record.");
 
@@ -1885,6 +1913,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             }
 
             case xlsb_type::BrtCellIsst: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < sizeof(brt_cell_isst))
                     throw runtime_error("Malformed BrtCellIsst record.");
 
@@ -1917,6 +1948,9 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
             }
 
             case xlsb_type::BrtCellRString: {
+                if (!in_sheet_data)
+                    break;
+
                 if (d.size() < offsetof(brt_cell_rstring, value.str))
                     throw runtime_error("Malformed BrtCellRString record.");
 
