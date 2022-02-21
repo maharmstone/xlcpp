@@ -1785,13 +1785,10 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
                 } else if (tm) {
-                    // FIXME
-//                     auto n = (unsigned int)(stod(v_val) * 86400.0);
-//
-//                     chrono::seconds t{n % 86400};
-//
-//                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr); // FIXME
+                    auto n = (unsigned int)(d * 86400.0);
+                    chrono::seconds t{n % 86400};
+
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
                 } else
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
 
@@ -1867,7 +1864,10 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
                 } else if (tm) {
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr); // FIXME
+                    auto n = (unsigned int)(h.xnum * 86400.0);
+                    chrono::seconds t{n % 86400};
+
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
                 } else
                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
 
