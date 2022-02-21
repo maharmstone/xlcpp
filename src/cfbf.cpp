@@ -438,8 +438,8 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                     string salt_value_b64, cipher_algorithm, key_bits_str, cipher_chaining, hash_algorithm;
                     unsigned int key_bits;
 
-                    r.attributes_loop_raw([&](string_view local_name, const xml_enc_string_view& namespace_uri_raw,
-                                              const xml_enc_string_view& value_raw) {
+                    r.attributes_loop_raw([&](string_view local_name, xml_enc_string_view namespace_uri_raw,
+                                              xml_enc_string_view value_raw) {
 
                         if (local_name == "saltValue")
                             salt_value_b64 = value_raw.decode();
@@ -498,8 +498,8 @@ void cfbf::parse_enc_info_44(span<const uint8_t> enc_info, u16string_view passwo
                            encrypted_verifier_hash_input_b64, encrypted_verifier_hash_value_b64, encrypted_key_value_b64;
                     unsigned int spin_count, key_bits;
 
-                    r.attributes_loop_raw([&](string_view local_name, const xml_enc_string_view& namespace_uri_raw,
-                                              const xml_enc_string_view& value_raw) {
+                    r.attributes_loop_raw([&](string_view local_name, xml_enc_string_view namespace_uri_raw,
+                                              xml_enc_string_view value_raw) {
 
                         if (local_name == "spinCount")
                             spin_count_str = value_raw.decode();
