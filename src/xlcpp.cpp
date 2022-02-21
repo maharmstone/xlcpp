@@ -1756,14 +1756,12 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
                 // FIXME - we can optimize is_date and is_time if one of the preset number formats
 
                 if (dt && tm) {
-                    // FIXME
-//                     auto d = stod(v_val);
-//                     auto n = (unsigned int)((d - (int)d) * 86400.0);
-//                     datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
-//
-//                     dt.d = number_to_date((int)d, date1904);
-//
-//                     c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
+                    auto n = (unsigned int)((d - (int)d) * 86400.0);
+                    datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
+
+                    dt.d = number_to_date((int)d, date1904);
+
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
                 } else if (dt) {
                     auto ymd = number_to_date((unsigned int)d, date1904);
 
@@ -1828,7 +1826,25 @@ void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> dat
 
                 auto number_format = find_number_format(h.cell.iStyleRef);
 
-                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
+                bool dt = is_date(number_format);
+                bool tm = is_time(number_format);
+                cell* c;
+
+                if (dt && tm) {
+                    auto n = (unsigned int)((h.xnum - (int)h.xnum) * 86400.0);
+                    datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
+
+                    dt.d = number_to_date((int)h.xnum, date1904);
+
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
+                } else if (dt) {
+                    auto ymd = number_to_date((unsigned int)h.xnum, date1904);
+
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
+                } else if (tm) {
+                    // FIXME
+                } else
+                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
 
                 c->impl->number_format = number_format;
 
