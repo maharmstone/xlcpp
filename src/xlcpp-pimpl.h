@@ -310,3 +310,54 @@ public:
 };
 
 using archive_write_t = std::unique_ptr<archive*, archive_write_closer>;
+
+
+static constexpr std::chrono::year_month_day number_to_date(unsigned int num, bool date1904) noexcept {
+    unsigned int J = num + 2415019;
+    unsigned int f, e, g, h;
+    unsigned int day, month;
+    int year;
+
+    if (date1904)
+        J += 1462;
+    else if (num < 61) // Excel's 29/2/1900 bug
+        J++;
+
+    f = J;
+    f *= 4;
+    f += 274277;
+    f /= 146097;
+    f *= 3;
+    f /= 4;
+    f += J;
+    f += 1363;
+
+    e = (f * 4) + 3;
+
+    g = e % 1461;
+    g /= 4;
+
+    h = (5 * g) + 2;
+
+    day = h % 153;
+    day /= 5;
+    day++;
+
+    month = h;
+    month /= 153;
+    month += 2;
+    month %= 12;
+    month++;
+
+    year = 14 - month;
+    year /= 12;
+    year -= 4716;
+    year += e / 1461;
+
+    return std::chrono::year_month_day{std::chrono::year{year}, std::chrono::month{month}, std::chrono::day{day}};
+}
+
+// xlcpp.cpp
+bool is_date(const std::string_view& sv);
+bool is_time(const std::string_view& sv);
+std::unordered_map<std::string, std::string> read_relationships(const std::string_view& fn, const std::unordered_map<std::string, xlcpp::file>& files);

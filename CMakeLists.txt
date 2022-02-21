@@ -25,7 +25,8 @@ set(SRC_FILES src/xlcpp.cpp
     src/aes.cpp
     src/sha1.cpp
     src/b64.cpp
-    src/sha512.cpp)
+    src/sha512.cpp
+    src/xlsb.cpp)
 
 add_library(xlcpp SHARED ${SRC_FILES})
 target_link_libraries(xlcpp ${LibArchive_LIBRARIES})

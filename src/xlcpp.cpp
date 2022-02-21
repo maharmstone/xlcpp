@@ -62,6 +62,121 @@ static const array builtin_styles = {
     pair{ 49, "@" },
 };
 
+bool is_date(const string_view& sv) {
+    if (sv == "General")
+        return false;
+
+    string s;
+
+    s.reserve(sv.length());
+
+    for (auto c : sv) {
+        if (c >= 'a' && c <= 'z') {
+            if (s.empty() || s.back() != c)
+                s += c;
+        } else if (c >= 'A' && c <= 'Z') {
+            if (s.empty() || s.back() != c - 'A' + 'a')
+                s += c - 'A' + 'a';
+        }
+    }
+
+    static const char* patterns[] = {
+        "dmy",
+        "ymd",
+        "mdy",
+        "my"
+    };
+
+    for (const auto& p : patterns) {
+        if (s.find(p) != string::npos)
+            return true;
+    }
+
+    return false;
+}
+
+bool is_time(const string_view& sv) {
+    if (sv == "General")
+        return false;
+
+    string s;
+
+    s.reserve(sv.length());
+
+    for (auto c : sv) {
+        if (c >= 'a' && c <= 'z') {
+            if (s.empty() || s.back() != c)
+                s += c;
+        } else if (c >= 'A' && c <= 'Z') {
+            if (s.empty() || s.back() != c - 'A' + 'a')
+                s += c - 'A' + 'a';
+        }
+    }
+
+    return s.find("hm") != string::npos;
+}
+
+static string try_decode(const optional<xml_enc_string_view>& sv) {
+    if (!sv)
+        return "";
+
+    return sv.value().decode();
+}
+
+unordered_map<string, string> read_relationships(const string_view& fn, const unordered_map<string, xlcpp::file>& files) {
+    filesystem::path p = fn;
+    unordered_map<string, string> rels;
+
+    p.remove_filename();
+    p /= "_rels";
+    p /= filesystem::path(fn).filename().string() + ".rels";
+
+    auto ps = p.string();
+
+    for (auto& c : ps) {
+        if (c == '\\')
+            c = '/';
+    }
+
+    if (files.count(ps) == 0)
+        throw formatted_error("File {} not found.", ps);
+
+    xml_reader r(files.at(ps).data);
+    unsigned int depth = 0;
+
+    while (r.read()) {
+        unsigned int next_depth;
+
+        if (r.node_type() == xml_node::element && !r.is_empty())
+            next_depth = depth + 1;
+        else if (r.node_type() == xml_node::end_element)
+            next_depth = depth - 1;
+        else
+            next_depth = depth;
+
+        if (r.node_type() == xml_node::element) {
+            if (depth == 0) {
+                if (r.local_name() != "Relationships" || !r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
+                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}Relationships.",
+                                          r.namespace_uri_raw().decode(), r.local_name(), NS_PACKAGE_RELATIONSHIPS);
+                }
+            } else if (depth == 1) {
+                if (r.local_name() == "Relationship" && r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
+                    auto id = try_decode(r.get_attribute("Id"));
+                    auto target = try_decode(r.get_attribute("Target"));
+
+                    if (!id.empty() && !target.empty())
+                        rels[id] = target;
+                }
+            }
+        }
+
+        depth = next_depth;
+    }
+
+    return rels;
+}
+
 namespace xlcpp {
 
 sheet& workbook_pimpl::add_sheet(const string_view& name, bool visible) {
@@ -211,51 +326,6 @@ static_assert(date_to_number(chrono::year_month_day{1900y, chrono::February, 28d
 static_assert(date_to_number(chrono::year_month_day{1900y, chrono::March, 1d}, false) == 61);
 static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, false) == 35981);
 static_assert(date_to_number(chrono::year_month_day{1998y, chrono::July, 5d}, true) == 34519);
-
-static constexpr chrono::year_month_day number_to_date(unsigned int num, bool date1904) noexcept {
-    unsigned int J = num + 2415019;
-    unsigned int f, e, g, h;
-    unsigned int day, month;
-    int year;
-
-    if (date1904)
-        J += 1462;
-    else if (num < 61) // Excel's 29/2/1900 bug
-        J++;
-
-    f = J;
-    f *= 4;
-    f += 274277;
-    f /= 146097;
-    f *= 3;
-    f /= 4;
-    f += J;
-    f += 1363;
-
-    e = (f * 4) + 3;
-
-    g = e % 1461;
-    g /= 4;
-
-    h = (5 * g) + 2;
-
-    day = h % 153;
-    day /= 5;
-    day++;
-
-    month = h;
-    month /= 153;
-    month += 2;
-    month %= 12;
-    month++;
-
-    year = 14 - month;
-    year /= 12;
-    year -= 4716;
-    year += e / 1461;
-
-    return chrono::year_month_day{chrono::year{year}, chrono::month{month}, chrono::day{day}};
-}
 
 static_assert(number_to_date(1, false) == chrono::year_month_day{1900y, chrono::January, 1d});
 static_assert(number_to_date(59, false) == chrono::year_month_day{1900y, chrono::February, 28d});
@@ -965,13 +1035,6 @@ workbook::workbook() {
     impl->date1904 = false;
 }
 
-static string try_decode(const optional<xml_enc_string_view>& sv) {
-    if (!sv)
-        return "";
-
-    return sv.value().decode();
-}
-
 static void parse_content_types(const string_view& ct, unordered_map<string, file>& files) {
     xml_reader r(ct);
     unsigned int depth = 0;
@@ -1046,60 +1109,6 @@ static const pair<const string, file>& find_workbook(const unordered_map<string,
     throw formatted_error("Could not find workbook file.");
 }
 
-static unordered_map<string, string> read_relationships(const string_view& fn, const unordered_map<string, file>& files) {
-    filesystem::path p = fn;
-    unordered_map<string, string> rels;
-
-    p.remove_filename();
-    p /= "_rels";
-    p /= filesystem::path(fn).filename().string() + ".rels";
-
-    auto ps = p.string();
-
-    for (auto& c : ps) {
-        if (c == '\\')
-            c = '/';
-    }
-
-    if (files.count(ps) == 0)
-        throw formatted_error("File {} not found.", ps);
-
-    xml_reader r(files.at(ps).data);
-    unsigned int depth = 0;
-
-    while (r.read()) {
-        unsigned int next_depth;
-
-        if (r.node_type() == xml_node::element && !r.is_empty())
-            next_depth = depth + 1;
-        else if (r.node_type() == xml_node::end_element)
-            next_depth = depth - 1;
-        else
-            next_depth = depth;
-
-        if (r.node_type() == xml_node::element) {
-            if (depth == 0) {
-                if (r.local_name() != "Relationships" || !r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
-                    throw formatted_error("Root tag was {{{}}}{}, expected {{{}}}Relationships.",
-                                          r.namespace_uri_raw().decode(), r.local_name(), NS_PACKAGE_RELATIONSHIPS);
-                }
-            } else if (depth == 1) {
-                if (r.local_name() == "Relationship" && r.namespace_uri_raw().cmp(NS_PACKAGE_RELATIONSHIPS)) {
-                    auto id = try_decode(r.get_attribute("Id"));
-                    auto target = try_decode(r.get_attribute("Target"));
-
-                    if (!id.empty() && !target.empty())
-                        rels[id] = target;
-                }
-            }
-        }
-
-        depth = next_depth;
-    }
-
-    return rels;
-}
-
 string workbook_pimpl::find_number_format(unsigned int num) {
     if (num >= cell_styles.size())
         return "";
@@ -1120,60 +1129,6 @@ string workbook_pimpl::find_number_format(unsigned int num) {
     }
 
     return "";
-}
-
-static bool is_date(const string_view& sv) {
-    if (sv == "General")
-        return false;
-
-    string s;
-
-    s.reserve(sv.length());
-
-    for (auto c : sv) {
-        if (c >= 'a' && c <= 'z') {
-            if (s.empty() || s.back() != c)
-                s += c;
-        } else if (c >= 'A' && c <= 'Z') {
-            if (s.empty() || s.back() != c - 'A' + 'a')
-                s += c - 'A' + 'a';
-        }
-    }
-
-    static const char* patterns[] = {
-        "dmy",
-        "ymd",
-        "mdy",
-        "my"
-    };
-
-    for (const auto& p : patterns) {
-        if (s.find(p) != string::npos)
-            return true;
-    }
-
-    return false;
-}
-
-static bool is_time(const string_view& sv) {
-    if (sv == "General")
-        return false;
-
-    string s;
-
-    s.reserve(sv.length());
-
-    for (auto c : sv) {
-        if (c >= 'a' && c <= 'z') {
-            if (s.empty() || s.back() != c)
-                s += c;
-        } else if (c >= 'A' && c <= 'Z') {
-            if (s.empty() || s.back() != c - 'A' + 'a')
-                s += c - 'A' + 'a';
-        }
-    }
-
-    return s.find("hm") != string::npos;
 }
 
 static constexpr bool __inline is_hex(char c) noexcept {
@@ -1622,458 +1577,6 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
     }
 }
 
-static void xlsb_walk(span<const uint8_t> data, const function<void(enum xlsb_type, span<const uint8_t>)>& func) {
-    while (!data.empty()) {
-        uint16_t type;
-        uint32_t length;
-
-        type = data[0];
-        data = data.subspan(1);
-
-        if (type & 0x80) {
-            type = (uint16_t)((type & 0x7f) | ((uint16_t)data[0] << 7));
-            data = data.subspan(1);
-        }
-
-        length = data[0];
-        data = data.subspan(1);
-
-        if (length & 0x80) {
-            length = (length & 0x7f) | ((uint32_t)data[0] << 7);
-            data = data.subspan(1);
-        }
-
-        if (length & 0x4000) {
-            length = (length & 0x3fff) | ((uint32_t)data[0] << 14);
-            data = data.subspan(1);
-        }
-
-        if (length & 0x200000) {
-            length = (length & 0x1fffff) | ((uint32_t)(data[0] & 0x7f) << 21);
-            data = data.subspan(1);
-        }
-
-        func((enum xlsb_type)type, data.subspan(0, length));
-
-        data = data.subspan(length);
-    }
-}
-
-void workbook_pimpl::load_sheet_binary(string_view name, span<const uint8_t> data, bool visible) {
-    auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
-    unsigned int last_index = 0, last_col = 0;
-    row* row = nullptr;
-    bool in_sheet_data = false;
-
-    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        switch (type) {
-            case xlsb_type::BrtBeginSheetData:
-                in_sheet_data = true;
-                break;
-
-            case xlsb_type::BrtEndSheetData:
-                in_sheet_data = false;
-                break;
-
-            case xlsb_type::BrtRowHdr: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(brt_row_hdr))
-                    throw runtime_error("Malformed BrtRowHdr record.");
-
-                const auto& h = *(brt_row_hdr*)d.data();
-
-                if (h.rw < last_index)
-                    throw formatted_error("Rows out of order.");
-
-                while (last_index < h.rw) {
-                    s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
-                    last_index++;
-                }
-
-                s.impl->rows.emplace(s.impl->rows.end(), *s.impl, s.impl->rows.size() + 1);
-
-                row = &s.impl->rows.back();
-
-                last_index = h.rw + 1;
-                last_col = 0;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellBlank:
-            case xlsb_type::BrtCellError:
-            case xlsb_type::BrtFmlaError: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(xlsb_cell))
-                    throw runtime_error("Malformed cell record.");
-
-                const auto& h = *(xlsb_cell*)d.data();
-
-                if (h.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.column + 1;
-
-                auto number_format = find_number_format(h.iStyleRef);
-
-                row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                break;
-            }
-
-            case xlsb_type::BrtCellRk: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(brt_cell_rk))
-                    throw runtime_error("Malformed BrtCellRk record.");
-
-                const auto& h = *(brt_cell_rk*)d.data();
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                double d;
-
-                if (h.value.fInt) {
-                    auto num = h.value.num;
-                    auto val = *reinterpret_cast<int32_t*>(&num);
-
-                    d = val;
-                } else {
-                    auto num = ((uint64_t)h.value.num) << 34;
-                    d = *reinterpret_cast<double*>(&num);
-                }
-
-                if (h.value.fx100)
-                    d /= 100.0;
-
-                bool dt = is_date(number_format);
-                bool tm = is_time(number_format);
-                cell* c;
-
-                // FIXME - we can optimize is_date and is_time if one of the preset number formats
-
-                if (dt && tm) {
-                    auto n = (unsigned int)((d - (int)d) * 86400.0);
-                    datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
-
-                    dt.d = number_to_date((int)d, date1904);
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
-                } else if (dt) {
-                    auto ymd = number_to_date((unsigned int)d, date1904);
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
-                } else if (tm) {
-                    auto n = (unsigned int)(d * 86400.0);
-                    chrono::seconds t{n % 86400};
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
-                } else
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, d);
-
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellBool:
-            case xlsb_type::BrtFmlaBool: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(brt_cell_bool))
-                    throw runtime_error("Malformed BrtCellBool record.");
-
-                const auto& h = *(brt_cell_bool*)d.data();
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.fBool != 0);
-
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellReal:
-            case xlsb_type::BrtFmlaNum: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(brt_cell_real))
-                    throw runtime_error("Malformed BrtCellReal record.");
-
-                const auto& h = *(brt_cell_real*)d.data();
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                bool dt = is_date(number_format);
-                bool tm = is_time(number_format);
-                cell* c;
-
-                if (dt && tm) {
-                    auto n = (unsigned int)((h.xnum - (int)h.xnum) * 86400.0);
-                    datetime dt(1970y, chrono::January, 1d, chrono::seconds{n});
-
-                    dt.d = number_to_date((int)h.xnum, date1904);
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, dt);
-                } else if (dt) {
-                    auto ymd = number_to_date((unsigned int)h.xnum, date1904);
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, ymd);
-                } else if (tm) {
-                    auto n = (unsigned int)(h.xnum * 86400.0);
-                    chrono::seconds t{n % 86400};
-
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, t);
-                } else
-                    c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, h.xnum);
-
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellSt:
-            case xlsb_type::BrtFmlaString: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < offsetof(brt_cell_st, str))
-                    throw runtime_error("Malformed BrtCellSt record.");
-
-                const auto& h = *(brt_cell_st*)d.data();
-
-                if (d.size() < offsetof(brt_cell_st, str) + (h.len * sizeof(char16_t)))
-                    throw runtime_error("Malformed BrtCellSt record.");
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                auto u16sv = u16string_view(h.str, h.len);
-
-                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-
-                // so we don't have to expose shared_string publicly
-                c->impl->val = utf16_to_utf8(u16sv);
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellIsst: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < sizeof(brt_cell_isst))
-                    throw runtime_error("Malformed BrtCellIsst record.");
-
-                const auto& h = *(brt_cell_isst*)d.data();
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                shared_string ss;
-                ss.num = h.isst;
-
-                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-
-                // so we don't have to expose shared_string publicly
-                delete c->impl;
-                c->impl = new cell_pimpl(*row->impl, (unsigned int)row->impl->cells.size(), ss);
-
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            case xlsb_type::BrtCellRString: {
-                if (!in_sheet_data)
-                    break;
-
-                if (d.size() < offsetof(brt_cell_rstring, value.str))
-                    throw runtime_error("Malformed BrtCellRString record.");
-
-                const auto& h = *(brt_cell_rstring*)d.data();
-
-                if (d.size() < offsetof(brt_cell_rstring, value.str) + (h.value.len * sizeof(char16_t)))
-                    throw runtime_error("Malformed BrtCellRString record.");
-
-                if (h.cell.column < last_col)
-                    throw formatted_error("Cells out of order.");
-
-                while (last_col < h.cell.column) {
-                    row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-                    last_col++;
-                }
-
-                last_col = h.cell.column + 1;
-
-                auto number_format = find_number_format(h.cell.iStyleRef);
-
-                auto u16sv = u16string_view(h.value.str, h.value.len);
-
-                auto c = &*row->impl->cells.emplace(row->impl->cells.end(), *row->impl, row->impl->cells.size() + 1, nullptr);
-
-                // so we don't have to expose shared_string publicly
-                c->impl->val = utf16_to_utf8(u16sv);
-
-                c->impl->number_format = number_format;
-
-                break;
-            }
-
-            default:
-                break;
-        }
-    });
-}
-
-void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> data, const unordered_map<string, file>& files) {
-    struct sheet_info {
-        sheet_info(string_view rid, string_view name, bool visible) :
-            rid(rid), name(name), visible(visible) { }
-
-        string rid;
-        string name;
-        bool visible;
-    };
-
-    vector<sheet_info> sheets_rels;
-
-    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        if (type == xlsb_type::BrtBundleSh) {
-            if (d.size() < sizeof(brt_bundle_sh))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto& h = *(brt_bundle_sh*)d.data();
-
-            d = d.subspan(sizeof(brt_bundle_sh));
-
-            if (d.size() < sizeof(uint32_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto relid_size = *(uint32_t*)d.data();
-
-            d = d.subspan(sizeof(uint32_t));
-
-            if (relid_size == 0xffffffff)
-                relid_size = 0;
-
-            if (d.size() < relid_size * sizeof(char16_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto strRelID = u16string_view((char16_t*)d.data(), relid_size);
-
-            d = d.subspan(relid_size * sizeof(char16_t));
-
-            if (d.size() < sizeof(uint32_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto name_size = *(uint32_t*)d.data();
-
-            d = d.subspan(sizeof(uint32_t));
-
-            if (d.size() < name_size * sizeof(char16_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
-
-            auto strName = u16string_view((char16_t*)d.data(), name_size);
-
-            sheets_rels.emplace_back(utf16_to_utf8(strRelID), utf16_to_utf8(strName), h.hsState == 0);
-        }
-    });
-
-    // FIXME - preserve sheet order
-
-    auto rels = read_relationships(fn, files);
-
-    for (const auto& sr : sheets_rels) {
-        for (const auto& r : rels) {
-            if (r.first == sr.rid) {
-                auto name = filesystem::path(fn);
-
-                // FIXME - can we resolve relative paths properly?
-
-                name.remove_filename();
-                name /= r.second;
-
-                auto ns = name.string();
-
-                for (auto& c : ns) {
-                    if (c == '\\')
-                        c = '/';
-                }
-
-                if (files.count(ns) == 0)
-                    throw formatted_error("File {} not found.", ns);
-
-                auto& d = files.at(ns).data;
-
-                load_sheet_binary(sr.name, span((uint8_t*)d.data(), d.size()), sr.visible);
-                break;
-            }
-        }
-    }
-}
-
 void workbook_pimpl::load_shared_strings2(const string_view& sv) {
     xml_reader r(sv);
     unsigned int depth = 0;
@@ -2114,24 +1617,6 @@ void workbook_pimpl::load_shared_strings2(const string_view& sv) {
 
         depth = next_depth;
     }
-}
-
-void workbook_pimpl::load_shared_strings_binary(span<const uint8_t> data) {
-    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        if (type == xlsb_type::BrtSSTItem) {
-            if (d.size() < offsetof(brt_sst_item, richStr.str))
-                throw runtime_error("Malformed BrtSSTItem record.");
-
-            const auto& h = *(brt_sst_item*)d.data();
-
-            if (d.size() < offsetof(brt_sst_item, richStr.str) + (sizeof(char16_t) * h.richStr.len))
-                throw runtime_error("Malformed BrtSSTItem record.");
-
-            auto u16sv = u16string_view(h.richStr.str, h.richStr.len);
-
-            shared_strings2.emplace_back(utf16_to_utf8(u16sv));
-        }
-    });
 }
 
 void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& files) {
@@ -2225,45 +1710,6 @@ void workbook_pimpl::load_styles2(const string_view& sv) {
 
         depth = next_depth;
     }
-}
-
-void workbook_pimpl::load_styles_binary(span<const uint8_t> data) {
-    bool in_cellxfs = false;
-
-    xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        fmt::print("{}, {}:", type, d.size());
-
-        for (auto c : d) {
-            fmt::print(" {:02x}", c);
-        }
-        fmt::print("\n");
-
-        if (type == xlsb_type::BrtBeginCellXFs)
-            in_cellxfs = true;
-        else if (type == xlsb_type::BrtEndCellXFs)
-            in_cellxfs = false;
-        else if (type == xlsb_type::BrtXF && in_cellxfs) {
-            optional<unsigned int> numfmtid;
-
-            if (d.size() < sizeof(brt_xf))
-                throw runtime_error("Malformed BrtXF record.");
-
-            const auto& h = *(brt_xf*)d.data();
-
-            fmt::print("ixfeParent = {}, iFmt = {}, iFont = {}, iFill = {}, ixBOrder = {}, trot = {}, indent = {}, alc = {}, alcv = {}, fWrap = {}, fJustLast = {}, fShrinkToFit = {}, fMergeCell = {}, iReadingOrder = {}, fLocked = {}, fHidden = {}, fSxButton = {}, f123Prefix = {}, xfGrbitAtr = {}\n", h.ixfeParent, h.iFmt, h.iFont, h.iFill, h.ixBOrder, h.trot, h.indent, h.alc, h.alcv, h.fWrap, h.fJustLast, h.fShrinkToFit, h.fMergeCell, h.iReadingOrder, h.fLocked, h.fHidden, h.fSxButton, h.f123Prefix, h.xfGrbitAtr);
-
-            numfmtid = h.iFmt;
-
-            if (h.xfGrbitAtr & 1)
-                numfmtid = nullopt;
-
-            cell_styles.push_back(numfmtid);
-        }
-
-        // FIXME - numFmt
-    });
-
-    fmt::print("---\n");
 }
 
 void workbook_pimpl::load_styles(const unordered_map<string, file>& files) {
