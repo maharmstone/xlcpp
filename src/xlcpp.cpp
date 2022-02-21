@@ -61,7 +61,7 @@ static const array builtin_styles = {
     pair{ 49, "@" },
 };
 
-bool is_date(const string_view& sv) {
+bool is_date(string_view sv) {
     if (sv == "General")
         return false;
 
@@ -94,7 +94,7 @@ bool is_date(const string_view& sv) {
     return false;
 }
 
-bool is_time(const string_view& sv) {
+bool is_time(string_view sv) {
     if (sv == "General")
         return false;
 
@@ -124,7 +124,7 @@ static string try_decode(const optional<xml_enc_string_view>& sv) {
     return sv.value().decode();
 }
 
-unordered_map<string, string> read_relationships(const string_view& fn, const unordered_map<string, xlcpp::file>& files) {
+unordered_map<string, string> read_relationships(string_view fn, const unordered_map<string, xlcpp::file>& files) {
     filesystem::path p = fn;
     unordered_map<string, string> rels;
 
@@ -180,11 +180,11 @@ unordered_map<string, string> read_relationships(const string_view& fn, const un
 
 namespace xlcpp {
 
-sheet& workbook_pimpl::add_sheet(const string_view& name, bool visible) {
+sheet& workbook_pimpl::add_sheet(string_view name, bool visible) {
     return *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 }
 
-sheet& workbook::add_sheet(const string_view& name, bool visible) {
+sheet& workbook::add_sheet(string_view name, bool visible) {
     return impl->add_sheet(name, visible);
 }
 
@@ -252,7 +252,7 @@ static constexpr from_chars_result from_chars_constexpr(const char* first, const
     return res;
 }
 
-static constexpr bool resolve_reference(const string_view& sv, unsigned int& row, unsigned int& col) noexcept {
+static constexpr bool resolve_reference(string_view sv, unsigned int& row, unsigned int& col) noexcept {
     from_chars_result fcr;
 
     if (sv.length() >= 2 && sv[0] >= 'A' && sv[0] <= 'Z' && sv[1] >= '0' && sv[1] <= '9') {
@@ -923,7 +923,7 @@ row& sheet::add_row() {
     return impl->add_row();
 }
 
-shared_string workbook_pimpl::get_shared_string(const string_view& s) {
+shared_string workbook_pimpl::get_shared_string(string_view s) {
     shared_string ss;
 
     if (shared_strings.contains(s))
@@ -948,15 +948,14 @@ cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const T& t) : parent(r), 
         sty = parent.parent.parent.find_style(style("General", "Arial", 10));
 }
 
-template<>
-cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, const string_view& t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
+cell_pimpl::cell_pimpl(row_pimpl& r, unsigned int num, string_view t) : cell_pimpl(r, num, r.parent.parent.get_shared_string(t)) {
 }
 
 cell::cell(row_pimpl& r, unsigned int num, int64_t val) {
     impl = new cell_pimpl(r, num, val);
 }
 
-cell::cell(row_pimpl& r, unsigned int num, const string_view& val) {
+cell::cell(row_pimpl& r, unsigned int num, string_view val) {
     impl = new cell_pimpl(r, num, val);
 }
 
@@ -999,15 +998,15 @@ bool operator==(const style& lhs, const style& rhs) noexcept {
         lhs.font == rhs.font;
 }
 
-void style::set_font(const string_view& font_name, unsigned int font_size, bool bold) {
+void style::set_font(string_view font_name, unsigned int font_size, bool bold) {
     this->font = xlcpp::font(font_name, font_size, bold);
 }
 
-void style::set_number_format(const string_view& fmt) {
+void style::set_number_format(string_view fmt) {
     number_format = fmt;
 }
 
-void cell_pimpl::set_font(const string_view& name, unsigned int size, bool bold) {
+void cell_pimpl::set_font(string_view name, unsigned int size, bool bold) {
     auto sty2 = *sty;
 
     sty2.set_font(name, size, bold);
@@ -1015,11 +1014,11 @@ void cell_pimpl::set_font(const string_view& name, unsigned int size, bool bold)
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_font(const string_view& name, unsigned int size, bool bold) {
+void cell::set_font(string_view name, unsigned int size, bool bold) {
     impl->set_font(name, size, bold);
 }
 
-void cell_pimpl::set_number_format(const string_view& fmt) {
+void cell_pimpl::set_number_format(string_view fmt) {
     auto sty2 = *sty;
 
     sty2.set_number_format(fmt);
@@ -1027,7 +1026,7 @@ void cell_pimpl::set_number_format(const string_view& fmt) {
     sty = parent.parent.parent.find_style(sty2);
 }
 
-void cell::set_number_format(const string_view& fmt) {
+void cell::set_number_format(string_view fmt) {
     impl->set_number_format(fmt);
 }
 
@@ -1036,7 +1035,7 @@ workbook::workbook() {
     impl->date1904 = false;
 }
 
-static void parse_content_types(const string_view& ct, unordered_map<string, file>& files) {
+static void parse_content_types(string_view ct, unordered_map<string, file>& files) {
     xml_reader r(ct);
     unsigned int depth = 0;
     unordered_map<string, string> defs, over;
@@ -1147,7 +1146,7 @@ static constexpr uint8_t __inline hex_digit(char c) noexcept {
     return 0;
 }
 
-static string decode_escape_sequences(const string_view& sv) {
+static string decode_escape_sequences(string_view sv) {
     bool has_underscore = false;
 
     if (sv.length() < 7)
@@ -1263,7 +1262,7 @@ static variant<datetime, chrono::year_month_day> parse_iso8601(string_view t) {
         throw formatted_error("Failed to parse ISO 8601 date \"{}\".", t);
 }
 
-void workbook_pimpl::load_sheet(const string_view& name, const string_view& data, bool visible) {
+void workbook_pimpl::load_sheet(string_view name, string_view data, bool visible) {
     auto& s = *sheets.emplace(sheets.end(), *this, name, sheets.size() + 1, visible);
 
     xml_reader r(data);
@@ -1480,12 +1479,12 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
     }
 }
 
-void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& data, const unordered_map<string, file>& files) {
+void workbook_pimpl::parse_workbook(string_view fn, string_view data, const unordered_map<string, file>& files) {
     xml_reader r(data);
     unsigned int depth = 0;
 
     struct sheet_info {
-        sheet_info(const string_view& rid, const string_view& name, bool visible) :
+        sheet_info(string_view rid, string_view name, bool visible) :
             rid(rid), name(name), visible(visible) { }
 
         string rid;
@@ -1578,7 +1577,7 @@ void workbook_pimpl::parse_workbook(const string_view& fn, const string_view& da
     }
 }
 
-void workbook_pimpl::load_shared_strings2(const string_view& sv) {
+void workbook_pimpl::load_shared_strings2(string_view sv) {
     xml_reader r(sv);
     unsigned int depth = 0;
     bool in_si = false;
@@ -1632,7 +1631,7 @@ void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& file
     }
 }
 
-void workbook_pimpl::load_styles2(const string_view& sv) {
+void workbook_pimpl::load_styles2(string_view sv) {
     xml_reader r(sv);
     unsigned int depth = 0;
     bool in_numfmts = false, in_cellxfs = false;
@@ -1899,7 +1898,7 @@ workbook::~workbook() {
     delete impl;
 }
 
-sheet::sheet(workbook_pimpl& wb, const string_view& name, unsigned int num, bool visible) {
+sheet::sheet(workbook_pimpl& wb, string_view name, unsigned int num, bool visible) {
     impl = new sheet_pimpl(wb, name, num, visible);
 }
 
@@ -1919,7 +1918,7 @@ cell& row::add_cell(int64_t val) {
     return impl->add_cell(val);
 }
 
-cell& row::add_cell(const string_view& val) {
+cell& row::add_cell(string_view val) {
     return impl->add_cell(val);
 }
 

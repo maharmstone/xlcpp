@@ -10,7 +10,7 @@
 using namespace std;
 
 #ifndef _WIN32
-errno_error::errno_error(const std::string_view& function, int en) : msg(function) {
+errno_error::errno_error(string_view function, int en) : msg(function) {
 	msg += " failed (";
 
 	switch (en) {

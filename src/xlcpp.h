@@ -42,7 +42,7 @@ public:
     workbook(const std::filesystem::path& fn, std::string_view password = "");
     workbook(std::span<const uint8_t> sv, std::string_view password = "");
     ~workbook();
-    sheet& add_sheet(const std::string_view& name, bool visible = true);
+    sheet& add_sheet(std::string_view name, bool visible = true);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
     const std::list<sheet>& sheets() const;
@@ -58,7 +58,7 @@ class row;
 
 class XLCPP sheet {
 public:
-    sheet(workbook_pimpl& wb, const std::string_view& name, unsigned int num, bool visible = true);
+    sheet(workbook_pimpl& wb, std::string_view name, unsigned int num, bool visible = true);
     ~sheet();
     row& add_row();
     std::string name() const;
@@ -94,7 +94,7 @@ class XLCPP cell {
 public:
     cell(row_pimpl& r, unsigned int num, std::nullptr_t);
     cell(row_pimpl& r, unsigned int num, int64_t val);
-    cell(row_pimpl& r, unsigned int num, const std::string_view& val);
+    cell(row_pimpl& r, unsigned int num, std::string_view val);
     cell(row_pimpl& r, unsigned int num, double val);
     cell(row_pimpl& r, unsigned int num, const std::chrono::year_month_day& val);
     cell(row_pimpl& r, unsigned int num, const std::chrono::seconds& val);
@@ -105,8 +105,8 @@ public:
     template<typename T>
     cell(row_pimpl& r, unsigned int num, T* t) = delete;
 
-    void set_number_format(const std::string_view& fmt);
-    void set_font(const std::string_view& name, unsigned int size, bool bold = false);
+    void set_number_format(std::string_view fmt);
+    void set_font(std::string_view name, unsigned int size, bool bold = false);
     std::string get_number_format() const;
     cell_t value() const;
 
@@ -121,7 +121,7 @@ public:
     ~row();
 
     cell& add_cell(int64_t val);
-    cell& add_cell(const std::string_view& val);
+    cell& add_cell(std::string_view val);
     cell& add_cell(double val);
     cell& add_cell(const std::chrono::year_month_day& val);
     cell& add_cell(const std::chrono::seconds& val);

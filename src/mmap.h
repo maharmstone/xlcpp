@@ -124,7 +124,7 @@ private:
 
 class errno_error : public std::exception {
 public:
-    errno_error(const std::string_view& function, int en);
+    errno_error(std::string_view function, int en);
 
     const char* what() const noexcept {
         return msg.c_str();

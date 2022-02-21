@@ -7,7 +7,7 @@ static bool __inline is_whitespace(char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-static void parse_attributes(const string_view& node, const function<bool(const string_view&, const xml_enc_string_view&)>& func) {
+static void parse_attributes(string_view node, const function<bool(string_view, const xml_enc_string_view&)>& func) {
     auto s = node.substr(1, node.length() - 2);
 
     if (!s.empty() && s.back() == '/') {
@@ -163,7 +163,7 @@ bool xml_reader::read() {
             type = xml_node::element;
             ns_list ns;
 
-            parse_attributes(node, [&](const string_view& name, const xml_enc_string_view& value) {
+            parse_attributes(node, [&](string_view name, const xml_enc_string_view& value) {
                 if (name.starts_with("xmlns:"))
                     ns.emplace_back(name.substr(6), value);
                 else if (name == "xmlns")
@@ -189,12 +189,12 @@ bool xml_reader::is_empty() const {
     return type == xml_node::element && empty_tag;
 }
 
-void xml_reader::attributes_loop_raw(const function<bool(const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+void xml_reader::attributes_loop_raw(const function<bool(string_view local_name, const xml_enc_string_view& namespace_uri_raw,
                                                          const xml_enc_string_view& value_raw)>& func) const {
     if (type != xml_node::element)
         return;
 
-    parse_attributes(node, [&](const string_view& name, const xml_enc_string_view& value_raw) {
+    parse_attributes(node, [&](string_view name, const xml_enc_string_view& value_raw) {
         auto colon = name.find_first_of(':');
 
         if (colon == string::npos)
@@ -213,13 +213,13 @@ void xml_reader::attributes_loop_raw(const function<bool(const string_view& loca
     });
 }
 
-optional<xml_enc_string_view> xml_reader::get_attribute(const string_view& name, const string_view& ns) const {
+optional<xml_enc_string_view> xml_reader::get_attribute(string_view name, string_view ns) const {
     if (type != xml_node::element)
         return nullopt;
 
     optional<xml_enc_string_view> xesv;
 
-    attributes_loop_raw([&](const string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+    attributes_loop_raw([&](string_view local_name, const xml_enc_string_view& namespace_uri_raw,
                             const xml_enc_string_view& value_raw) {
         if (local_name == name && namespace_uri_raw.cmp(ns)) {
             xesv = value_raw;
@@ -294,7 +294,7 @@ string xml_reader::value() const {
     }
 }
 
-static string esc_char(const string_view& s) {
+static string esc_char(string_view s) {
     uint32_t c = 0;
     from_chars_result fcr;
 
@@ -386,7 +386,7 @@ string xml_enc_string_view::decode() const {
     return s;
 }
 
-bool xml_enc_string_view::cmp(const string_view& str) const {
+bool xml_enc_string_view::cmp(string_view str) const {
     for (auto c : sv) {
         if (c == '&')
             return decode() == str;

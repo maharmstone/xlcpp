@@ -11,7 +11,7 @@ void xml_writer::start_document() {
     empty_tag = false;
 }
 
-static string xml_escape(const string_view& s, bool att) {
+static string xml_escape(string_view s, bool att) {
     string ret;
 
     ret.reserve(s.length());
@@ -32,7 +32,7 @@ static string xml_escape(const string_view& s, bool att) {
     return ret;
 }
 
-void xml_writer::start_element(const string_view& tag, const unordered_map<string, string>& namespaces) {
+void xml_writer::start_element(string_view tag, const unordered_map<string, string>& namespaces) {
     if (empty_tag)
         buf += ">";
 
@@ -63,7 +63,7 @@ void xml_writer::end_element() {
     tags.pop();
 }
 
-void xml_writer::text(const string_view& s) {
+void xml_writer::text(string_view s) {
     if (empty_tag) {
         buf += ">";
         empty_tag = false;
@@ -72,6 +72,6 @@ void xml_writer::text(const string_view& s) {
     buf += xml_escape(s, false);
 }
 
-void xml_writer::attribute(const string_view& name, const string_view& value) {
+void xml_writer::attribute(string_view name, string_view value) {
     buf += " " + string{name} + "=\"" + xml_escape(value, true) + "\"";
 }

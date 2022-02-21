@@ -28,7 +28,7 @@ typedef struct {
 
 class font {
 public:
-    font(const std::string_view& font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
+    font(std::string_view font_name, unsigned int font_size, bool bold) : font_name(font_name), font_size(font_size), bold(bold) { }
 
     std::string font_name;
     unsigned int font_size;
@@ -48,11 +48,11 @@ bool operator==(const font& lhs, const font& rhs) noexcept;
 
 class style {
 public:
-    style(const std::string_view& number_format, const std::string_view& font, unsigned int font_size, bool bold = false) :
+    style(std::string_view number_format, std::string_view font, unsigned int font_size, bool bold = false) :
         number_format(number_format), font(font, font_size, bold) { }
 
-    void set_font(const std::string_view& font_name, unsigned int font_size, bool bold);
-    void set_number_format(const std::string_view& fmt);
+    void set_font(std::string_view font_name, unsigned int font_size, bool bold);
+    void set_number_format(std::string_view fmt);
 
     std::string number_format;
     xlcpp::font font;
@@ -76,7 +76,7 @@ public:
     workbook_pimpl() = default;
     workbook_pimpl(const std::filesystem::path& fn, std::string_view password);
     workbook_pimpl(std::span<const uint8_t> sv, std::string_view password);
-    sheet& add_sheet(const std::string_view& name, bool visible);
+    sheet& add_sheet(std::string_view name, bool visible);
     void save(const std::filesystem::path& fn) const;
     std::string data() const;
 
@@ -84,22 +84,22 @@ public:
     void write_content_types_xml(struct archive* a) const;
     void write_rels(struct archive* a) const;
     void write_workbook_rels(struct archive* a) const;
-    shared_string get_shared_string(const std::string_view& s);
+    shared_string get_shared_string(std::string_view s);
     void write_shared_strings(struct archive* a) const;
     void write_styles(struct archive* a) const;
     void write_archive(struct archive* a) const;
     la_ssize_t write_callback(struct archive* a, const void* buffer, size_t length) const;
-    void parse_workbook(const std::string_view& fn, const std::string_view& data,
+    void parse_workbook(std::string_view fn, std::string_view data,
                         const std::unordered_map<std::string, file>& files);
     void parse_workbook_binary(std::string_view fn, std::span<const uint8_t> data,
                                const std::unordered_map<std::string, file>& files);
-    void load_sheet(const std::string_view& name, const std::string_view& data, bool visible);
+    void load_sheet(std::string_view name, std::string_view data, bool visible);
     void load_sheet_binary(std::string_view name, std::span<const uint8_t> data, bool visible);
-    void load_shared_strings2(const std::string_view& sv);
+    void load_shared_strings2(std::string_view sv);
     void load_shared_strings_binary(std::span<const uint8_t> data);
     void load_shared_strings(const std::unordered_map<std::string, file>& files);
     void load_styles(const std::unordered_map<std::string, file>& files);
-    void load_styles2(const std::string_view& sv);
+    void load_styles2(std::string_view sv);
     void load_styles_binary(std::span<const uint8_t> data);
     std::string find_number_format(unsigned int num);
     void load_archive(struct archive* a);
@@ -140,7 +140,7 @@ private:
 
 class sheet_pimpl {
 public:
-    sheet_pimpl(workbook_pimpl& wb, const std::string_view& name, unsigned int num, bool visible) : parent(wb), name(name), num(num), visible(visible) { }
+    sheet_pimpl(workbook_pimpl& wb, std::string_view name, unsigned int num, bool visible) : parent(wb), name(name), num(num), visible(visible) { }
 
     void write(struct archive* a) const;
     std::string xml() const;
@@ -172,10 +172,11 @@ public:
     template<typename T>
     cell_pimpl(row_pimpl& r, unsigned int num, const T& t);
 
+    cell_pimpl(row_pimpl& r, unsigned int num, std::string_view t);
     cell_pimpl(row_pimpl& r, unsigned int num, const std::chrono::system_clock::time_point& val) : cell_pimpl(r, num, datetime{val}) { }
 
-    void set_number_format(const std::string_view& fmt);
-    void set_font(const std::string_view& name, unsigned int size, bool bold = false);
+    void set_number_format(std::string_view fmt);
+    void set_font(std::string_view name, unsigned int size, bool bold = false);
 
     row_pimpl& parent;
 
@@ -192,10 +193,10 @@ class xml_writer {
 public:
     std::string dump() const;
     void start_document();
-    void start_element(const std::string_view& tag, const std::unordered_map<std::string, std::string>& namespaces = {});
+    void start_element(std::string_view tag, const std::unordered_map<std::string, std::string>& namespaces = {});
     void end_element();
-    void text(const std::string_view& s);
-    void attribute(const std::string_view& name, const std::string_view& value);
+    void text(std::string_view s);
+    void attribute(std::string_view name, std::string_view value);
 
 private:
     std::string buf;
@@ -253,14 +254,14 @@ struct fmt::formatter<enum xml_node> {
 class xml_enc_string_view {
 public:
     xml_enc_string_view() { }
-    xml_enc_string_view(const std::string_view& sv) : sv(sv) { }
+    xml_enc_string_view(std::string_view sv) : sv(sv) { }
 
     bool empty() const noexcept {
         return sv.empty();
     }
 
     std::string decode() const;
-    bool cmp(const std::string_view& str) const;
+    bool cmp(std::string_view str) const;
 
 private:
     std::string_view sv;
@@ -270,13 +271,13 @@ using ns_list = std::vector<std::pair<std::string_view, xml_enc_string_view>>;
 
 class xml_reader {
 public:
-    xml_reader(const std::string_view& sv) : sv(sv) { }
+    xml_reader(std::string_view sv) : sv(sv) { }
     bool read();
     enum xml_node node_type() const;
     bool is_empty() const;
-    void attributes_loop_raw(const std::function<bool(const std::string_view& local_name, const xml_enc_string_view& namespace_uri_raw,
+    void attributes_loop_raw(const std::function<bool(std::string_view local_name, const xml_enc_string_view& namespace_uri_raw,
                                                       const xml_enc_string_view& value_raw)>& func) const;
-    std::optional<xml_enc_string_view> get_attribute(const std::string_view& name, const std::string_view& ns = "") const;
+    std::optional<xml_enc_string_view> get_attribute(std::string_view name, std::string_view ns = "") const;
     xml_enc_string_view namespace_uri_raw() const;
     std::string_view name() const;
     std::string_view local_name() const;
@@ -358,6 +359,6 @@ static constexpr std::chrono::year_month_day number_to_date(unsigned int num, bo
 }
 
 // xlcpp.cpp
-bool is_date(const std::string_view& sv);
-bool is_time(const std::string_view& sv);
-std::unordered_map<std::string, std::string> read_relationships(const std::string_view& fn, const std::unordered_map<std::string, xlcpp::file>& files);
+bool is_date(std::string_view sv);
+bool is_time(std::string_view sv);
+std::unordered_map<std::string, std::string> read_relationships(std::string_view fn, const std::unordered_map<std::string, xlcpp::file>& files);
