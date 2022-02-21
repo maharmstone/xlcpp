@@ -1411,8 +1411,6 @@ void workbook_pimpl::load_sheet(const string_view& name, const string_view& data
                 cell* c;
                 string number_format;
 
-                // FIXME - d, date
-
                 if (!s_val.empty())
                     number_format = find_number_format(stoi(s_val));
 
