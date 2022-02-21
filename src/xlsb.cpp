@@ -497,42 +497,67 @@ void workbook_pimpl::load_shared_strings_binary(span<const uint8_t> data) {
 }
 
 void workbook_pimpl::load_styles_binary(span<const uint8_t> data) {
-    bool in_cellxfs = false;
+    bool in_numfmts = false, in_cellxfs = false;
 
     xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        fmt::print("{}, {}:", type, d.size());
+        switch (type) {
+            case xlsb_type::BrtBeginCellXFs:
+                in_cellxfs = true;
+            break;
 
-        for (auto c : d) {
-            fmt::print(" {:02x}", c);
+            case xlsb_type::BrtEndCellXFs:
+                in_cellxfs = false;
+            break;
+
+            case xlsb_type::BrtBeginFmts:
+                in_numfmts = true;
+            break;
+
+            case xlsb_type::BrtEndFmts:
+                in_numfmts = false;
+            break;
+
+            case xlsb_type::BrtXF:
+                if (in_cellxfs) {
+                    optional<unsigned int> numfmtid;
+
+                    if (d.size() < sizeof(brt_xf))
+                        throw runtime_error("Malformed BrtXF record.");
+
+                    const auto& h = *(brt_xf*)d.data();
+
+                    numfmtid = h.iFmt;
+
+                    if (h.xfGrbitAtr & 1)
+                        numfmtid = nullopt;
+
+                    cell_styles.push_back(numfmtid);
+                }
+            break;
+
+            case xlsb_type::BrtFmt:
+                if (in_numfmts) {
+                    if (d.size() < offsetof(brt_fmt, stFmtCode))
+                        throw runtime_error("Malformed BrtFmt record.");
+
+                    const auto& h = *(brt_fmt*)d.data();
+
+                    if (d.size() < offsetof(brt_fmt, stFmtCode) + (h.stFmtCode_len * sizeof(char16_t)))
+                        throw runtime_error("Malformed BrtFmt record.");
+
+                    auto u16sv = u16string_view(h.stFmtCode, h.stFmtCode_len);
+                    auto s = utf16_to_utf8(u16sv);
+
+                    // FIXME - removing backslashes?
+
+                    number_formats[h.ifmt] = s;
+                }
+            break;
+
+            default:
+                break;
         }
-        fmt::print("\n");
-
-        if (type == xlsb_type::BrtBeginCellXFs)
-            in_cellxfs = true;
-        else if (type == xlsb_type::BrtEndCellXFs)
-            in_cellxfs = false;
-        else if (type == xlsb_type::BrtXF && in_cellxfs) {
-            optional<unsigned int> numfmtid;
-
-            if (d.size() < sizeof(brt_xf))
-                throw runtime_error("Malformed BrtXF record.");
-
-            const auto& h = *(brt_xf*)d.data();
-
-            fmt::print("ixfeParent = {}, iFmt = {}, iFont = {}, iFill = {}, ixBOrder = {}, trot = {}, indent = {}, alc = {}, alcv = {}, fWrap = {}, fJustLast = {}, fShrinkToFit = {}, fMergeCell = {}, iReadingOrder = {}, fLocked = {}, fHidden = {}, fSxButton = {}, f123Prefix = {}, xfGrbitAtr = {}\n", h.ixfeParent, h.iFmt, h.iFont, h.iFill, h.ixBOrder, h.trot, h.indent, h.alc, h.alcv, h.fWrap, h.fJustLast, h.fShrinkToFit, h.fMergeCell, h.iReadingOrder, h.fLocked, h.fHidden, h.fSxButton, h.f123Prefix, h.xfGrbitAtr);
-
-            numfmtid = h.iFmt;
-
-            if (h.xfGrbitAtr & 1)
-                numfmtid = nullopt;
-
-            cell_styles.push_back(numfmtid);
-        }
-
-        // FIXME - numFmt
     });
-
-    fmt::print("---\n");
 }
 
 };

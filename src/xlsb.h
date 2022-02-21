@@ -2695,3 +2695,13 @@ struct brt_wb_prop {
     uint32_t dwThemeVersion;
     uint32_t strName_len;
 };
+
+#pragma pack(push,1)
+
+struct brt_fmt {
+    uint16_t ifmt;
+    uint32_t stFmtCode_len;
+    char16_t stFmtCode[0];
+};
+
+#pragma pack(pop)

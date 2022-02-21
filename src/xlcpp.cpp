@@ -112,6 +112,8 @@ bool is_time(const string_view& sv) {
         }
     }
 
+    // FIXME - "h AM/PM" etc.
+
     return s.find("hm") != string::npos;
 }
 
