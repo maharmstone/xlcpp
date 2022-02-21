@@ -3,7 +3,6 @@
 #include "mmap.h"
 #include "cfbf.h"
 #include "utf16.h"
-#include "xlsb.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <vector>
@@ -1626,6 +1625,7 @@ void workbook_pimpl::load_shared_strings(const unordered_map<string, file>& file
             return;
         } else if (f.second.content_type == "application/vnd.ms-excel.sharedStrings") {
             load_shared_strings_binary(span((uint8_t*)f.second.data.data(), f.second.data.size()));
+            return;
         }
     }
 }
