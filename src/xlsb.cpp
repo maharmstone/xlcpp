@@ -386,44 +386,62 @@ void workbook_pimpl::parse_workbook_binary(string_view fn, span<const uint8_t> d
     vector<sheet_info> sheets_rels;
 
     xlsb_walk(data, [&](enum xlsb_type type, span<const uint8_t> d) {
-        if (type == xlsb_type::BrtBundleSh) {
-            if (d.size() < sizeof(brt_bundle_sh))
-                throw runtime_error("Malformed BrtBundleSh entry.");
+        switch (type) {
+            case xlsb_type::BrtBundleSh: {
+                if (d.size() < sizeof(brt_bundle_sh))
+                    throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto& h = *(brt_bundle_sh*)d.data();
+                auto& h = *(brt_bundle_sh*)d.data();
 
-            d = d.subspan(sizeof(brt_bundle_sh));
+                d = d.subspan(sizeof(brt_bundle_sh));
 
-            if (d.size() < sizeof(uint32_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
+                if (d.size() < sizeof(uint32_t))
+                    throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto relid_size = *(uint32_t*)d.data();
+                auto relid_size = *(uint32_t*)d.data();
 
-            d = d.subspan(sizeof(uint32_t));
+                d = d.subspan(sizeof(uint32_t));
 
-            if (relid_size == 0xffffffff)
-                relid_size = 0;
+                if (relid_size == 0xffffffff)
+                    relid_size = 0;
 
-            if (d.size() < relid_size * sizeof(char16_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
+                if (d.size() < relid_size * sizeof(char16_t))
+                    throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto strRelID = u16string_view((char16_t*)d.data(), relid_size);
+                auto strRelID = u16string_view((char16_t*)d.data(), relid_size);
 
-            d = d.subspan(relid_size * sizeof(char16_t));
+                d = d.subspan(relid_size * sizeof(char16_t));
 
-            if (d.size() < sizeof(uint32_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
+                if (d.size() < sizeof(uint32_t))
+                    throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto name_size = *(uint32_t*)d.data();
+                auto name_size = *(uint32_t*)d.data();
 
-            d = d.subspan(sizeof(uint32_t));
+                d = d.subspan(sizeof(uint32_t));
 
-            if (d.size() < name_size * sizeof(char16_t))
-                throw runtime_error("Malformed BrtBundleSh entry.");
+                if (d.size() < name_size * sizeof(char16_t))
+                    throw runtime_error("Malformed BrtBundleSh entry.");
 
-            auto strName = u16string_view((char16_t*)d.data(), name_size);
+                auto strName = u16string_view((char16_t*)d.data(), name_size);
 
-            sheets_rels.emplace_back(utf16_to_utf8(strRelID), utf16_to_utf8(strName), h.hsState == 0);
+                sheets_rels.emplace_back(utf16_to_utf8(strRelID), utf16_to_utf8(strName), h.hsState == 0);
+
+                break;
+            }
+
+            case xlsb_type::BrtWbProp: {
+                if (d.size() < sizeof(brt_wb_prop))
+                    throw runtime_error("Malformed BrtWbProp entry.");
+
+                const auto& h = *(brt_wb_prop*)d.data();
+
+                date1904 = h.f1904;
+
+                break;
+            }
+
+            default:
+                break;
         }
     });
 

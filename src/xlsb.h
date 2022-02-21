@@ -2672,3 +2672,26 @@ struct brt_xf {
 };
 
 #pragma pack(pop)
+
+struct brt_wb_prop {
+    uint32_t f1904 : 1;
+    uint32_t reserved1 : 1;
+    uint32_t fHideBorderUnselLists : 1;
+    uint32_t fFilterPrivacy : 1;
+    uint32_t fBuggedUserABoutSolution : 1;
+    uint32_t fShowInkAnnotation : 1;
+    uint32_t fBackup : 1;
+    uint32_t fNoSaveSup : 1;
+    uint32_t grbitUpdateLinks : 2;
+    uint32_t fHidePivotTableFList : 1;
+    uint32_t fPublishedBookItems : 1;
+    uint32_t fCheckCompat : 1;
+    uint32_t mdDspObj : 2;
+    uint32_t fShowPivotChartFilter : 1;
+    uint32_t fAutoCompressPictures : 1;
+    uint32_t reserved2 : 1;
+    uint32_t fRefreshAll : 1;
+    uint32_t unused : 13;
+    uint32_t dwThemeVersion;
+    uint32_t strName_len;
+};
