@@ -7,16 +7,16 @@
 #include <vector>
 #include <span>
 #include <array>
+#include <format>
 #include <fmt/format.h>
 #include <fmt/compile.h>
 
 static const uint64_t CFBF_SIGNATURE = 0xe11ab1a1e011cfd0;
 
-class _formatted_error : public std::exception {
+class formatted_error : public std::exception {
 public:
-    template<typename T, typename... Args>
-    _formatted_error(T&& s, Args&&... args) {
-        msg = fmt::format(s, std::forward<Args>(args)...);
+    template<typename... Args>
+    formatted_error(std::format_string<Args...> s, Args&&... args) : msg(std::format(s, std::forward<Args>(args)...)) {
     }
 
     const char* what() const noexcept {
@@ -26,8 +26,6 @@ public:
 private:
     std::string msg;
 };
-
-#define formatted_error(s, ...) _formatted_error(FMT_COMPILE(s), ##__VA_ARGS__)
 
 class cfbf;
 struct dirent;

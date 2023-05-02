@@ -188,23 +188,6 @@ sheet& workbook::add_sheet(string_view name, bool visible) {
     return impl->add_sheet(name, visible);
 }
 
-class _formatted_error : public exception {
-public:
-    template<typename T, typename... Args>
-    _formatted_error(T&& s, Args&&... args) {
-        msg = fmt::format(s, forward<Args>(args)...);
-    }
-
-    const char* what() const noexcept {
-        return msg.c_str();
-    }
-
-private:
-    string msg;
-};
-
-#define formatted_error(s, ...) _formatted_error(FMT_COMPILE(s), ##__VA_ARGS__)
-
 static string make_reference(unsigned int row, unsigned int col) {
     char colstr[5];
 
