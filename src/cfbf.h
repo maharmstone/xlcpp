@@ -8,8 +8,6 @@
 #include <span>
 #include <array>
 #include <format>
-#include <fmt/format.h>
-#include <fmt/compile.h>
 
 static const uint64_t CFBF_SIGNATURE = 0xe11ab1a1e011cfd0;
 

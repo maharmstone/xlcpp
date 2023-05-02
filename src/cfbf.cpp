@@ -1,4 +1,3 @@
-#include <fmt/format.h>
 #include <fstream>
 #include <charconv>
 #include "cfbf.h"
