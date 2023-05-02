@@ -215,42 +215,6 @@ enum class xml_node {
     cdata
 };
 
-template<>
-struct fmt::formatter<enum xml_node> {
-    constexpr auto parse(format_parse_context& ctx) {
-        auto it = ctx.begin();
-
-        if (it != ctx.end() && *it != '}')
-            throw format_error("invalid format");
-
-        return it;
-    }
-
-    template<typename format_context>
-    auto format(enum xml_node n, format_context& ctx) const {
-        switch (n) {
-            case xml_node::unknown:
-                return fmt::format_to(ctx.out(), "unknown");
-            case xml_node::text:
-                return fmt::format_to(ctx.out(), "text");
-            case xml_node::whitespace:
-                return fmt::format_to(ctx.out(), "whitespace");
-            case xml_node::element:
-                return fmt::format_to(ctx.out(), "element");
-            case xml_node::end_element:
-                return fmt::format_to(ctx.out(), "end_element");
-            case xml_node::processing_instruction:
-                return fmt::format_to(ctx.out(), "processing_instruction");
-            case xml_node::comment:
-                return fmt::format_to(ctx.out(), "comment");
-            case xml_node::cdata:
-                return fmt::format_to(ctx.out(), "cdata");
-            default:
-                return fmt::format_to(ctx.out(), "{:x}", (unsigned int)n);
-        }
-    }
-};
-
 class xml_enc_string_view {
 public:
     xml_enc_string_view() { }
