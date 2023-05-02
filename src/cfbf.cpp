@@ -1,5 +1,6 @@
 #include <fstream>
 #include <charconv>
+#include <string.h>
 #include "cfbf.h"
 #include "utf16.h"
 #include "sha1.h"

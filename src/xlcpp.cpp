@@ -13,10 +13,6 @@
 #include <windows.h>
 #endif
 
-#define FMT_HEADER_ONLY
-#include <fmt/format.h>
-#include <fmt/compile.h>
-
 #define BLOCK_SIZE 20480
 
 using namespace std;
@@ -1966,17 +1962,17 @@ ostream& operator<<(ostream& os, const cell& c) {
         else if constexpr (is_same_v<T, shared_string>)
             os << c.impl->parent.parent.parent.shared_strings2[arg.num];
         else if constexpr (is_same_v<T, chrono::year_month_day>)
-            os << fmt::format("{:04}-{:02}-{:02}", (int)arg.year(), (unsigned int)arg.month(), (unsigned int)arg.day());
+            os << format("{:04}-{:02}-{:02}", (int)arg.year(), (unsigned int)arg.month(), (unsigned int)arg.day());
         else if constexpr (is_same_v<T, chrono::seconds>) {
             const auto& t = chrono::hh_mm_ss{arg};
 
-            os << fmt::format("{:02}:{:02}:{:02}", t.hours().count(), t.minutes().count(), t.seconds().count());
+            os << format("{:02}:{:02}:{:02}", t.hours().count(), t.minutes().count(), t.seconds().count());
         } else if constexpr (is_same_v<T, datetime>) {
             const auto& t = chrono::hh_mm_ss{arg.t};
 
-            os << fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                            (int)arg.d.year(), (unsigned int)arg.d.month(), (unsigned int)arg.d.day(),
-                            t.hours().count(), t.minutes().count(), t.seconds().count());
+            os << format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                         (int)arg.d.year(), (unsigned int)arg.d.month(), (unsigned int)arg.d.day(),
+                         t.hours().count(), t.minutes().count(), t.seconds().count());
         } else if constexpr (is_same_v<T, nullptr_t>) {
             // nop
         } else if constexpr (is_same_v<T, string>)

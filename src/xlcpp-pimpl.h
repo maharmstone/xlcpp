@@ -13,7 +13,6 @@
 #include <span>
 #include <archive.h>
 #include <archive_entry.h>
-#include <fmt/format.h>
 
 namespace xlcpp {
 
