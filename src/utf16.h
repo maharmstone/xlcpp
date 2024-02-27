@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <bit>
 
 template<typename T>
 requires (std::is_same_v<T, char16_t> || (sizeof(wchar_t) == 2 && std::is_same_v<T, wchar_t>))
