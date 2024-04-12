@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.17)
 
+project(xlcpp
+    LANGUAGES CXX
+)
+
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-
-project(xlcpp)
 
 option(BUILD_STATIC "Build static library" ON)
 option(BUILD_SAMPLE "Build sample program" ON)
