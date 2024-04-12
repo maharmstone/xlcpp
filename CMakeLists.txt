@@ -44,6 +44,11 @@ endif()
 
 set_target_properties(xlcpp PROPERTIES PUBLIC_HEADER src/xlcpp.h)
 
+target_include_directories(xlcpp PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
 install(TARGETS xlcpp
     EXPORT xlcpp-targets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
