@@ -53,6 +53,10 @@ install(TARGETS xlcpp
     PRIVATE_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 
+if(MSVC)
+    install(FILES $<TARGET_PDB_FILE:xlcpp> DESTINATION bin OPTIONAL)
+endif()
+
 if(BUILD_STATIC)
     add_library(xlcppstatic STATIC ${SRC_FILES})
     target_link_libraries(xlcppstatic LibArchive::LibArchive)
@@ -65,11 +69,19 @@ if(BUILD_SAMPLE)
     target_link_libraries(xltest xlcpp)
     install(TARGETS xltest DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
 
+    if(MSVC)
+        install(FILES $<TARGET_PDB_FILE:xltest> DESTINATION bin OPTIONAL)
+    endif()
+
     # TESTING
     add_executable(cfbf src/cfbf.cpp src/mmap.cpp src/sha1.cpp src/aes.cpp src/cfbf-test.cpp src/xml-reader.cpp src/b64.cpp src/sha512.cpp)
     target_include_directories(cfbf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(cfbf xlcpp)
     install(TARGETS cfbf DESTINATION "${CMAKE_INSTALL_FULL_BINDIR}")
+
+    if(MSVC)
+        install(FILES $<TARGET_PDB_FILE:cfbf> DESTINATION bin OPTIONAL)
+    endif()
 
     target_compile_options(cfbf PRIVATE
         $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
