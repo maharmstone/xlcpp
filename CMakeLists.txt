@@ -104,3 +104,8 @@ configure_package_config_file(
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/xlcppConfig.cmake" DESTINATION "lib/cmake/xlcpp")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libxlcpp.pdb" DESTINATION "${CMAKE_INSTALL_BINDIR}" OPTIONAL)
+
+set(CPACK_PACKAGE_NAME xlcpp-dev)
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mark Harmstone")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libarchive-dev")
+include(CPack)
