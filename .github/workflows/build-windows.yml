@@ -9,7 +9,7 @@ jobs:
       - run: echo "SHORT_SHA=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_ENV
       - run: git clone ${{ github.server_url }}/${{ github.repository }} ${SHORT_SHA}
       - run: cd ${SHORT_SHA} && git checkout ${{ github.sha }}
-      - run: mkdir libarchive && cd libarchive && wget -qO- https://www.burntcomma.com/libarchive-3.6.1-x86_64-pc-windows-msvc.tar.gz | tar -xz
+      - run: mkdir libarchive && cd libarchive && wget -qO- https://www.burntcomma.com/packages/libarchive-3.7.2-x86_64-pc-windows-msvc.tar.gz | tar -xz
       - run: |
           cmake -DCMAKE_TOOLCHAIN_FILE=msvc-amd64.cmake \
             -DCMAKE_INSTALL_PREFIX=${PWD}/install/debug -DCMAKE_INSTALL_INCLUDEDIR=../include \
